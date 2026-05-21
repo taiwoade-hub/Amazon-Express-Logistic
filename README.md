@@ -1,0 +1,245 @@
+# Amozon Express Logistics 🚚
+
+A modern courier delivery and tracking system built with **React.js** and **Supabase**.  
+It allows users to send packages, generate tracking IDs, and track deliveries in real-time.
+
+---
+
+## 🚀 Features
+
+### 📦 User Features
+- Send package delivery requests
+- Auto-generated tracking IDs
+- Real-time shipment tracking
+- View delivery status updates with timeline visualization
+
+### 🧑‍💼 Admin Features
+- View all deliveries in a dashboard table
+- Update shipment status in real-time
+- Track delivery records and metadata
+
+---
+
+## 🧠 System Overview
+
+The system is built around 3 core actions:
+
+1. **Create Delivery** - Submit package details via form
+2. **Store in Supabase** - Data persisted in PostgreSQL
+3. **Track via Tracking ID** - Retrieve and monitor package status
+
+---
+
+## 🛠️ Tech Stack
+
+- **Frontend**: React.js + Vite
+- **Routing**: React Router
+- **Backend**: Supabase (Database + Realtime)
+- **Database**: PostgreSQL (via Supabase)
+- **Styling**: Tailwind CSS
+- **Icons**: Lucide React
+
+---
+
+## 🗄️ Database Structure (Supabase)
+
+### Table: `deliveries`
+
+```sql
+CREATE TABLE deliveries (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tracking_id TEXT UNIQUE NOT NULL,
+  sender_name TEXT NOT NULL,
+  receiver_name TEXT NOT NULL,
+  pickup_location TEXT NOT NULL,
+  destination TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  package_type TEXT NOT NULL,
+  status TEXT DEFAULT 'processing',
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+```
+
+**Status Values**: `processing`, `picked_up`, `in_transit`, `delivered`
+
+---
+
+## 🔑 Environment Variables
+
+Create a `.env` file in the root directory:
+
+```
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+Get these values from your Supabase project settings.
+
+---
+
+## 🔌 Supabase Setup
+
+1. Go to [https://supabase.com](https://supabase.com)
+2. Create a new project
+3. In the SQL Editor, run the schema creation script:
+   - Copy the SQL from `src/lib/createSchema.sql`
+   - Execute it in your Supabase SQL Editor
+4. Copy your API keys:
+   - Go to Settings → API
+   - Copy `Project URL` and `anon public` key
+5. Add them to your `.env` file
+
+---
+
+## 📁 Project Structure
+
+```
+src/
+ ├── components/
+ │    └── Navbar.jsx              # Navigation component
+ │
+ ├── pages/
+ │    ├── Home.jsx                # Landing page
+ │    ├── SendPackage.jsx          # Create delivery form
+ │    ├── Track.jsx                # Track delivery by ID
+ │    └── Admin.jsx                # Admin dashboard
+ │
+ ├── lib/
+ │    ├── supabaseClient.js        # Supabase client initialization
+ │    └── createSchema.sql         # Database schema
+ │
+ ├── App.jsx                        # Main app with routing
+ ├── main.jsx                       # React entry point
+ └── index.css                      # Global styles
+```
+
+---
+
+## 📦 Core Workflow
+
+### 1. Create Delivery
+- User fills form on `/send`
+- React validates and sends to Supabase
+- Auto-generated tracking ID (format: `AXL-XXXXXX`)
+
+### 2. Generate Tracking ID
+```javascript
+const random = Math.floor(Math.random() * 1000000)
+const trackingId = `AXL-${String(random).padStart(6, '0')}`
+// Example: AXL-839201
+```
+
+### 3. Track Package
+- User enters tracking ID on `/track`
+- System queries Supabase for delivery
+- Display timeline with current status
+
+### 4. Update Status (Admin)
+- Admin navigates to `/admin`
+- Table shows all deliveries
+- Click edit icon to change status
+- Real-time Supabase subscription updates data
+
+---
+
+## 📍 Tracking Status Flow
+
+```
+Processing → Picked Up → In Transit → Delivered
+```
+
+Timeline visualization shows active and completed steps.
+
+---
+
+⚙️ Installation & Setup
+
+```bash
+# 1. Clone or install the project
+git clone <your-repo>
+
+# 2. Install dependencies
+pnpm install
+
+# 3. Create .env file with Supabase keys
+cp .env.example .env
+# Edit .env with your Supabase credentials
+
+# 4. Set up database schema
+# - Go to Supabase SQL Editor
+# - Copy/paste src/lib/createSchema.sql
+# - Execute
+
+# 5. Start development server
+pnpm dev
+
+# 6. Open http://localhost:5173 in your browser
+```
+
+---
+
+## 🚀 Production Build
+
+```bash
+# Build for production
+pnpm build
+
+# Preview build locally
+pnpm preview
+```
+
+Output will be in the `dist/` folder.
+
+---
+
+## 🎨 Design System
+
+The app follows a clean, modern design with:
+- Primary Color: `#0f172a` (dark navy)
+- Background: `#ffffff` (white)
+- Soft Background: `#f8fafc` (light blue-gray)
+- Text Muted: `#64748b` (slate gray)
+- Border: `#e2e8f0` (light gray)
+
+All components use Tailwind CSS with rounded corners (`rounded-xl`), soft borders, and subtle hover effects.
+
+---
+
+## 🧪 Future Improvements
+
+- User authentication with Supabase Auth
+- Map-based delivery tracking
+- SMS/Email notifications
+- Rider assignment system
+- Payment integration (Stripe)
+- Mobile app version
+- Real-time WebSocket updates
+- Delivery history for users
+- Package weight/dimensions tracking
+- Rate calculation based on distance/type
+
+---
+
+## 🎯 Project Goal
+
+To build a fast, simple, and scalable courier tracking system that can be expanded into a full logistics platform.
+
+---
+
+## 📄 License
+
+This project is open-source and available for personal and commercial use.
+
+---
+
+## 👨‍💻 Support
+
+For issues or questions:
+1. Check the Supabase documentation: https://supabase.com/docs
+2. Review the React Router docs: https://reactrouter.com
+3. Check Tailwind CSS: https://tailwindcss.com
+
+---
+
+**Built with ❤️ for modern logistics**

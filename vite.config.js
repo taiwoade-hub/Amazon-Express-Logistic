@@ -1,0 +1,18 @@
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import path from 'path'
+
+export default defineConfig({
+  plugins: [react()],
+  base: '/Amazon-Express-Logistic/',
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, 'src'),
+      'react-icons/fc': path.resolve(__dirname, 'src/lib/react-icons-fc.jsx')
+    }
+  },
+  server: {
+    port: 5173,
+    host: true
+  }
+})
