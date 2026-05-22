@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
-import { Edit2, Save, X, Search, Package, ShieldAlert, Image as ImageIcon, Eye, Trash2 } from 'lucide-react'
+import { Edit2, Save, X, Search, Package, ShieldAlert, Image as ImageIcon, Eye, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { getDeliveryImages } from '../lib/deliveryImages'
 
 function Admin() {
   const { user, isAdmin, changeAdminEmail, getAdminEmail } = useAuth()
@@ -14,8 +15,8 @@ function Admin() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   
-  // Image modal Zoom State
-  const [zoomImageUrl, setZoomImageUrl] = useState(null)
+  const [zoomImages, setZoomImages] = useState([])
+  const [zoomIndex, setZoomIndex] = useState(0)
 
   // Profile Edit States
   const [newAdminEmail, setNewAdminEmail] = useState('')
@@ -334,22 +335,35 @@ function Admin() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-black text-sm text-black bg-white">
-                  {filteredDeliveries.map((delivery) => (
+                  {filteredDeliveries.map((delivery) => {
+                    const images = getDeliveryImages(delivery.package_image)
+                    const mainImage = images[0]
+                    const extraCount = Math.max(0, images.length - 1)
+
+                    return (
                     <tr key={delivery.id} className="hover:bg-black/5 transition-all">
                       {/* Tracking ID & Picture */}
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
-                          {delivery.package_image ? (
+                          {mainImage ? (
                             <div 
                               className="relative cursor-zoom-in group flex-shrink-0"
-                              onClick={() => setZoomImageUrl(delivery.package_image)}
+                              onClick={() => {
+                                setZoomImages(images)
+                                setZoomIndex(0)
+                              }}
                               title="Click to zoom image"
                             >
                               <img 
-                                src={delivery.package_image} 
+                                src={mainImage} 
                                 alt="Package Thumbnail" 
                                 className="w-12 h-12 rounded-xl object-cover border border-black group-hover:opacity-90 transition-all bg-white"
                               />
+                              {extraCount > 0 && (
+                                <div className="absolute -bottom-2 -right-2 bg-black text-white text-[10px] font-black px-2 py-0.5 rounded-full border border-black">
+                                  +{extraCount}
+                                </div>
+                              )}
                               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-xl transition-all">
                                 <Eye size={12} className="text-white" />
                               </div>
@@ -442,25 +456,41 @@ function Admin() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
 
             {/* Mobile Cards View */}
             <div className="md:hidden divide-y divide-black">
-              {filteredDeliveries.map((delivery) => (
+              {filteredDeliveries.map((delivery) => {
+                const images = getDeliveryImages(delivery.package_image)
+                const mainImage = images[0]
+                const extraCount = Math.max(0, images.length - 1)
+
+                return (
                 <div key={delivery.id} className="p-6 space-y-4 bg-white">
                   {/* Header: ID, Image & Actions */}
                   <div className="flex justify-between items-start gap-4">
                     <div className="flex gap-3">
-                      {delivery.package_image ? (
-                        <img 
-                          src={delivery.package_image} 
-                          alt="Package Preview" 
-                          onClick={() => setZoomImageUrl(delivery.package_image)}
-                          className="w-14 h-14 rounded-xl object-cover border border-black bg-white cursor-zoom-in"
-                        />
+                      {mainImage ? (
+                        <div className="relative">
+                          <img 
+                            src={mainImage} 
+                            alt="Package Preview" 
+                            onClick={() => {
+                              setZoomImages(images)
+                              setZoomIndex(0)
+                            }}
+                            className="w-14 h-14 rounded-xl object-cover border border-black bg-white cursor-zoom-in"
+                          />
+                          {extraCount > 0 && (
+                            <div className="absolute -bottom-2 -right-2 bg-black text-white text-[10px] font-black px-2 py-0.5 rounded-full border border-black">
+                              +{extraCount}
+                            </div>
+                          )}
+                        </div>
                       ) : (
                         <div className="w-14 h-14 rounded-xl bg-black border border-black flex items-center justify-center text-white flex-shrink-0">
                           <Package size={24} />
@@ -561,30 +591,66 @@ function Admin() {
                     )}
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
           </>
         )}
       </div>
 
       {/* Full zoom Image Modal */}
-      {zoomImageUrl && (
-        <div 
-          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-6 cursor-zoom-out"
-          onClick={() => setZoomImageUrl(null)}
+      {zoomImages.length > 0 && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-6"
+          onClick={() => setZoomImages([])}
         >
-          <div className="relative max-w-3xl max-h-full">
+          <div className="relative max-w-4xl w-full max-h-full" onClick={(e) => e.stopPropagation()}>
             <button
-              onClick={() => setZoomImageUrl(null)}
+              onClick={() => setZoomImages([])}
               className="absolute top-4 right-4 bg-black hover:bg-white text-white hover:text-black p-2 rounded-full border border-black transition-all"
             >
               <X size={20} />
             </button>
-            <img 
-              src={zoomImageUrl} 
-              alt="Package Zoomed Preview" 
-              className="rounded-2xl max-w-full max-h-[85vh] object-contain border border-black"
+
+            {zoomImages.length > 1 && (
+              <>
+                <button
+                  onClick={() => setZoomIndex((prev) => (prev - 1 + zoomImages.length) % zoomImages.length)}
+                  className="absolute top-1/2 -translate-y-1/2 left-4 bg-black/70 hover:bg-white text-white hover:text-black p-2 rounded-full border border-black transition-all"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <button
+                  onClick={() => setZoomIndex((prev) => (prev + 1) % zoomImages.length)}
+                  className="absolute top-1/2 -translate-y-1/2 right-4 bg-black/70 hover:bg-white text-white hover:text-black p-2 rounded-full border border-black transition-all"
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </>
+            )}
+
+            <img
+              src={zoomImages[zoomIndex]}
+              alt="Package zoomed preview"
+              className="rounded-2xl max-w-full max-h-[85vh] object-contain border border-black mx-auto"
             />
+
+            {zoomImages.length > 1 && (
+              <div className="mt-4 flex items-center justify-center gap-2">
+                {zoomImages.map((src, index) => (
+                  <button
+                    key={`${src}-${index}`}
+                    type="button"
+                    onClick={() => setZoomIndex(index)}
+                    className={`w-14 h-14 rounded-xl overflow-hidden border transition-colors ${
+                      index === zoomIndex ? 'border-white' : 'border-white/20 hover:border-white/60'
+                    }`}
+                  >
+                    <img src={src} alt={`Thumb ${index + 1}`} className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

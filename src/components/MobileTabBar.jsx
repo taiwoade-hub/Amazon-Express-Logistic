@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Home, Package, Truck, User, ShieldAlert } from 'lucide-react'
+import { Home, Package, Truck, User, ShieldAlert, Bell } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 function MobileTabBar() {
@@ -12,6 +12,7 @@ function MobileTabBar() {
     { to: '/', label: 'Home', icon: Home },
     { to: '/track', label: 'Track', icon: Truck },
     { to: '/send', label: 'Send', icon: Package },
+    user && !isAdmin ? { to: '/notifications', label: 'Inbox', icon: Bell } : null,
     user
       ? isAdmin
         ? { to: '/admin', label: 'Admin', icon: ShieldAlert }
@@ -23,7 +24,7 @@ function MobileTabBar() {
 
   return (
     <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border bg-white/95 backdrop-blur">
-      <div className="max-w-7xl mx-auto px-6 pt-2 pb-5 grid grid-cols-4">
+      <div className={`max-w-7xl mx-auto px-6 pt-2 pb-5 grid ${items.length === 5 ? 'grid-cols-5' : 'grid-cols-4'}`}>
         {items.map((item) => {
           const Icon = item.icon
           const active = isActive(item.to)

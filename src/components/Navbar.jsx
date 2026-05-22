@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { Truck, Info, Menu, X, LogOut, User, ShieldAlert, Package, Home } from 'lucide-react'
+import { Truck, Info, Menu, X, LogOut, User, ShieldAlert, Package, Home, Bell } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import { COMPANY_PROFILE } from '../lib/companyProfile'
 
 function Navbar() {
   const isMock = supabase.isMock
@@ -52,8 +53,8 @@ function Navbar() {
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           
           <Link to="/" className="flex items-center gap-3 font-black text-primary tracking-tight">
-            <img src="/logo.svg" alt="Amazon Logistics Logo" className="w-8 h-8" />
-            <span className="text-base sm:text-xl truncate max-w-[180px]">amazonlogisics.com</span>
+            <img src={COMPANY_PROFILE.logoSrc} alt={`${COMPANY_PROFILE.name} logo`} className="w-8 h-8" />
+            <span className="text-base sm:text-xl truncate max-w-[180px]">{COMPANY_PROFILE.name}</span>
           </Link>
 
           {/* Desktop Links */}
@@ -63,7 +64,10 @@ function Navbar() {
             <Link to="/track" className={navLinkClass('/track')}>Track</Link>
             
             {user && !isAdmin && (
-              <Link to="/dashboard" className={navLinkClass('/dashboard')}>My Portal</Link>
+              <>
+                <Link to="/dashboard" className={navLinkClass('/dashboard')}>My Portal</Link>
+                <Link to="/notifications" className={navLinkClass('/notifications')}>Notifications</Link>
+              </>
             )}
             
             {isAdmin && (
@@ -134,12 +138,20 @@ function Navbar() {
             </Link>
             
             {user && !isAdmin && (
-              <Link to="/dashboard" onClick={() => setMobileMenuOpen(false)} className={mobileNavLinkClass('/dashboard')}>
-                <div className="flex items-center gap-3">
-                  <User size={18} />
-                  <span>My Portal</span>
-                </div>
-              </Link>
+              <>
+                <Link to="/dashboard" onClick={() => setMobileMenuOpen(false)} className={mobileNavLinkClass('/dashboard')}>
+                  <div className="flex items-center gap-3">
+                    <User size={18} />
+                    <span>My Portal</span>
+                  </div>
+                </Link>
+                <Link to="/notifications" onClick={() => setMobileMenuOpen(false)} className={mobileNavLinkClass('/notifications')}>
+                  <div className="flex items-center gap-3">
+                    <Bell size={18} />
+                    <span>Notifications</span>
+                  </div>
+                </Link>
+              </>
             )}
  
             {isAdmin && (

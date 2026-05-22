@@ -9,9 +9,12 @@ It allows users to send packages, generate tracking IDs, and track deliveries in
 
 ### 📦 User Features
 - Send package delivery requests
+- Upload up to **4** package images (auto-compressed)
 - Auto-generated tracking IDs
 - Real-time shipment tracking
 - View delivery status updates with timeline visualization
+- Modern delivery receipts for **Delivered** and **Cancelled** packages
+- Receipt notifications (toast popup + saved inbox page)
 - Pickup & destination country selectors
 - Delivery notes + delivery notes language
 - Pinned/frequent addresses (up to 10, saved per user when database table exists with safe local fallback)
@@ -19,6 +22,7 @@ It allows users to send packages, generate tracking IDs, and track deliveries in
 ### 🧑‍💼 Admin Features
 - View all deliveries in a dashboard table
 - Update shipment status in real-time
+- Mark shipments as **cancelled** or **delivered** (generates receipts for users)
 - Track delivery records and metadata
 
 ---
@@ -70,7 +74,13 @@ CREATE TABLE deliveries (
 );
 ```
 
-**Status Values**: `processing`, `picked_up`, `in_transit`, `delivered`
+**Status Values**: `processing`, `picked_up`, `in_transit`, `delivered`, `cancelled`
+
+**Package Images (`package_image`)**
+- Supports up to **4** images
+- Stored as either:
+  - a single image string (backward compatible)
+  - a JSON array string of images
 
 ### Table: `address_book` (Pinned Addresses)
 
@@ -120,12 +130,15 @@ Get these values from your Supabase project settings.
 ```
 src/
  ├── components/
- │    └── Navbar.jsx              # Navigation component
+ │    ├── Navbar.jsx              # Navigation component
+ │    ├── DeliveryReceipt.jsx     # Modern receipt UI
+ │    └── ToastHost.jsx           # Toast notifications renderer
  │
  ├── pages/
  │    ├── Home.jsx                # Landing page
  │    ├── SendPackage.jsx          # Create delivery form
  │    ├── Track.jsx                # Track delivery by ID
+ │    ├── Notifications.jsx        # Receipt inbox page
  │    └── Admin.jsx                # Admin dashboard
  │
  ├── lib/
@@ -133,6 +146,11 @@ src/
  │    └── createSchema.sql         # Database schema
  │    └── countries.js             # Country list for dropdowns
  │    └── deliveryLanguages.js     # Delivery-notes language list
+ │    └── deliveryImages.js        # Multi-image helpers (max 4)
+ │    └── companyProfile.js        # Site name/logo/contact details
+ │
+ ├── context/
+ │    └── ToastContext.jsx         # In-app toast notifications
  │
  ├── App.jsx                        # Main app with routing
  ├── main.jsx                       # React entry point
@@ -175,6 +193,14 @@ Processing → Picked Up → In Transit → Delivered
 ```
 
 Timeline visualization shows active and completed steps.
+
+---
+
+## 🔔 Notifications & Receipt Inbox
+
+- Toast notification appears when a tracked package becomes **Delivered** or **Cancelled**
+- `/notifications` page keeps a history of receipts (delivered/cancelled) and updates in realtime
+- Receipts include tracking code, sender/receiver details, notes, timestamps, and up to 4 photos
 
 ---
 
@@ -248,11 +274,23 @@ All components use Tailwind CSS with rounded corners (`rounded-xl`), soft border
 - Payment integration (Stripe)
 - Mobile app version
 - Real-time WebSocket updates
-- Delivery history for users
 - Package weight/dimensions tracking
 - Rate calculation based on distance/type
 
 ---
+
+## ⬆️ Push Updates To GitHub
+
+If you already pushed this project before, you just need to commit your new changes and push again:
+
+```bash
+git status
+git add .
+git commit -m "feat: receipts notifications inbox"
+git push origin main
+```
+
+If GitHub asks for login, use a GitHub Personal Access Token (PAT) as the password.
 
 ## 🎯 Project Goal
 

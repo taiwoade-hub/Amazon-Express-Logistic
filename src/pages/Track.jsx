@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
-import { Package, Search, MapPin, Calendar, Clock, Phone, AlertCircle, ArrowLeft, Image as ImageIcon } from 'lucide-react'
+import { Package, Search, AlertCircle, ArrowLeft, Image as ImageIcon, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import DeliveryReceipt from '../components/DeliveryReceipt'
+import { getDeliveryImages } from '../lib/deliveryImages'
+import { useToast } from '../context/ToastContext'
 
 const statusSteps = ['processing', 'picked_up', 'in_transit', 'delivered']
 const statusLabels = {
@@ -27,6 +30,40 @@ function Track() {
   const [delivery, setDelivery] = useState(null)
   const [error, setError] = useState('')
   const [searched, setSearched] = useState(false)
+  const [zoomImages, setZoomImages] = useState([])
+  const [zoomIndex, setZoomIndex] = useState(0)
+  const { notify } = useToast()
+
+  const scrollToReceipt = useCallback(() => {
+    const node = document.getElementById('delivery-receipt')
+    if (!node) return
+    node.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [])
+
+  const showReceiptToast = useCallback((nextDelivery) => {
+    const status = nextDelivery?.status
+    if (status !== 'delivered' && status !== 'cancelled') return
+
+    const tracking = String(nextDelivery?.tracking_id || '').trim()
+    if (!tracking) return
+
+    const stamp = String(nextDelivery?.updated_at || nextDelivery?.created_at || '').trim()
+    const key = `receipt_toast_${tracking}_${status}_${stamp || 'na'}`
+    try {
+      if (localStorage.getItem(key)) return
+      localStorage.setItem(key, '1')
+    } catch {
+    }
+
+    notify({
+      variant: status === 'delivered' ? 'success' : 'danger',
+      title: status === 'delivered' ? 'Package delivered' : 'Package cancelled',
+      message: `Tracking ID: ${tracking}`,
+      actionLabel: 'View receipt',
+      onAction: scrollToReceipt,
+      durationMs: 6500
+    })
+  }, [notify, scrollToReceipt])
 
   useEffect(() => {
     const idParam = searchParams.get('id')
@@ -61,6 +98,7 @@ function Track() {
         setDelivery(null)
       } else {
         setDelivery(data)
+        showReceiptToast(data)
       }
     } catch (err) {
       console.error('Error tracking delivery:', err)
@@ -82,6 +120,34 @@ function Track() {
   }
 
   const currentStatusIndex = getCurrentStatusIndex()
+  const showReceipt = delivery?.status === 'delivered' || delivery?.status === 'cancelled'
+  const images = getDeliveryImages(delivery?.package_image)
+
+  useEffect(() => {
+    if (!delivery || supabase.isMock) return
+    if (!delivery.tracking_id) return
+
+    const channel = supabase
+      .channel(`track_delivery_${delivery.tracking_id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'deliveries' }, (payload) => {
+        const next = payload?.new
+        if (!next) return
+        if (String(next.tracking_id || '').toUpperCase() !== String(delivery.tracking_id || '').toUpperCase()) return
+
+        setDelivery((prev) => {
+          const prevStatus = prev?.status
+          if (next?.status !== prevStatus) {
+            showReceiptToast(next)
+          }
+          return next
+        })
+      })
+      .subscribe()
+
+    return () => {
+      channel.unsubscribe()
+    }
+  }, [delivery?.tracking_id, showReceiptToast])
 
   return (
     <main className="relative overflow-hidden bg-background min-h-screen">
@@ -146,10 +212,23 @@ function Track() {
         )}
 
         {delivery && (
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-8 items-start">
+          <div className="space-y-8">
+            {showReceipt && (
+              <div id="delivery-receipt">
+                <DeliveryReceipt
+                  delivery={delivery}
+                  onImageClick={(nextImages, index) => {
+                    setZoomImages(nextImages || [])
+                    setZoomIndex(index || 0)
+                  }}
+                />
+              </div>
+            )}
+
+          <div className={showReceipt ? '' : 'grid grid-cols-1 md:grid-cols-5 gap-8 items-start'}>
           
           {/* Left panel: Details & Picture */}
-          <div className="md:col-span-2 space-y-6">
+          {!showReceipt && <div className="md:col-span-2 space-y-6">
             
             {/* Package Details */}
             <div className="glass-panel rounded-3xl p-6 bg-white space-y-5">
@@ -183,28 +262,34 @@ function Track() {
             </div>
 
             {/* Package Attachment (Image display) */}
-            {delivery.package_image && (
+            {images.length > 0 && (
               <div className="glass-panel rounded-3xl p-6 bg-white">
                 <div className="flex items-center gap-2 mb-4 pb-3 border-b border-border">
                   <ImageIcon size={16} className="text-primary" />
-                  <span className="text-xs font-black text-primary uppercase tracking-wider">Package Photo</span>
+                  <span className="text-xs font-black text-primary uppercase tracking-wider">Package Photos</span>
                 </div>
-                <div className="relative rounded-2xl overflow-hidden border border-border bg-white">
-                  <img 
-                    src={delivery.package_image} 
-                    alt="Package Attachment" 
-                    className="w-full h-auto max-h-[300px] object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/0 to-black/0 flex items-end p-4">
-                    <span className="text-[10px] font-black text-white uppercase tracking-wider">Verified Shipment Photo</span>
-                  </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {images.map((src, index) => (
+                    <button
+                      key={`${src}-${index}`}
+                      type="button"
+                      onClick={() => {
+                        setZoomImages(images)
+                        setZoomIndex(index)
+                      }}
+                      className="group relative rounded-2xl overflow-hidden border border-border bg-white active:scale-95 transition-transform"
+                    >
+                      <img src={src} alt={`Package ${index + 1}`} className="w-full h-32 object-cover group-hover:opacity-95 transition-opacity" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
-          </div>
+          </div>}
 
           {/* Right panel: Timeline progression */}
-          <div className="md:col-span-3 glass-panel rounded-3xl p-6 sm:p-8 bg-white">
+          <div className={`${showReceipt ? '' : 'md:col-span-3 '}glass-panel rounded-3xl p-6 sm:p-8 bg-white`}>
             <h3 className="text-xl font-black text-primary tracking-tight mb-8 pb-3 border-b border-border">Delivery Route Milestones</h3>
             
             {delivery.status === 'cancelled' ? (
@@ -284,6 +369,63 @@ function Track() {
 
           </div>
 
+          </div>
+
+          {zoomImages.length > 0 && (
+            <div
+              className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-6"
+              onClick={() => setZoomImages([])}
+            >
+              <div className="relative max-w-4xl w-full max-h-full" onClick={(e) => e.stopPropagation()}>
+                <button
+                  onClick={() => setZoomImages([])}
+                  className="absolute top-4 right-4 bg-black hover:bg-white text-white hover:text-black p-2 rounded-full border border-black transition-all"
+                >
+                  <X size={20} />
+                </button>
+
+                {zoomImages.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => setZoomIndex((prev) => (prev - 1 + zoomImages.length) % zoomImages.length)}
+                      className="absolute top-1/2 -translate-y-1/2 left-4 bg-black/70 hover:bg-white text-white hover:text-black p-2 rounded-full border border-black transition-all"
+                    >
+                      <ChevronLeft size={20} />
+                    </button>
+                    <button
+                      onClick={() => setZoomIndex((prev) => (prev + 1) % zoomImages.length)}
+                      className="absolute top-1/2 -translate-y-1/2 right-4 bg-black/70 hover:bg-white text-white hover:text-black p-2 rounded-full border border-black transition-all"
+                    >
+                      <ChevronRight size={20} />
+                    </button>
+                  </>
+                )}
+
+                <img
+                  src={zoomImages[zoomIndex]}
+                  alt="Package zoomed preview"
+                  className="rounded-2xl max-w-full max-h-[85vh] object-contain border border-black mx-auto"
+                />
+
+                {zoomImages.length > 1 && (
+                  <div className="mt-4 flex items-center justify-center gap-2">
+                    {zoomImages.map((src, index) => (
+                      <button
+                        key={`${src}-${index}`}
+                        type="button"
+                        onClick={() => setZoomIndex(index)}
+                        className={`w-14 h-14 rounded-xl overflow-hidden border transition-colors ${
+                          index === zoomIndex ? 'border-white' : 'border-white/20 hover:border-white/60'
+                        }`}
+                      >
+                        <img src={src} alt={`Thumb ${index + 1}`} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           </div>
         )}
       </div>

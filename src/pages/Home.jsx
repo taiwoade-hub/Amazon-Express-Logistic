@@ -140,12 +140,6 @@ function Home() {
             <ShipmentForm title="Send a Package" description="Fill in the details below to create a new delivery." />
           </div>
         </section>
-
-        <footer className="border-t border-border py-10 bg-white">
-          <div className="max-w-7xl mx-auto px-6 text-center text-text-muted text-xs font-semibold">
-            <p>&copy; {new Date().getFullYear()} All rights reserved.</p>
-          </div>
-        </footer>
       </div>
     </main>
   )

@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { Copy, Check, Upload, Trash2, Phone, MapPin, Package, AlertCircle } from 'lucide-react'
 import { COUNTRIES } from '../lib/countries'
 import { DELIVERY_LANGUAGES } from '../lib/deliveryLanguages'
+import { serializeDeliveryImages } from '../lib/deliveryImages'
 
 function generateTrackingId() {
   const random = Math.floor(Math.random() * 1000000)
@@ -18,7 +19,7 @@ function ShipmentForm({ title, description }) {
   const [trackingId, setTrackingId] = useState('')
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState('')
-  const [imagePreview, setImagePreview] = useState('')
+  const [imagePreviews, setImagePreviews] = useState([])
   const [dragActive, setDragActive] = useState(false)
   const [savedAddresses, setSavedAddresses] = useState([])
   const [pickupSavedId, setPickupSavedId] = useState('')
@@ -267,25 +268,40 @@ function ShipmentForm({ title, description }) {
     })
   }
 
-  const handleImageChange = async (e) => {
-    const file = e.target.files[0]
-    if (!file) return
+  const appendImages = async (filesInput) => {
+    const files = Array.from(filesInput || []).filter(Boolean)
+    if (files.length === 0) return
 
-    if (!file.type.startsWith('image/')) {
-      setError('Please select an image file.')
+    const remaining = 4 - imagePreviews.length
+    if (remaining <= 0) {
+      setError('You can add up to 4 images only.')
+      return
+    }
+
+    const selected = files.slice(0, remaining)
+    const invalid = selected.find((file) => !file.type?.startsWith('image/'))
+    if (invalid) {
+      setError('Please select image files only.')
       return
     }
 
     try {
       setError('')
-      const compressedBase64 = await compressImage(file)
-      setImagePreview(compressedBase64)
+      const compressed = await Promise.all(selected.map((file) => compressImage(file)))
+      setImagePreviews((prev) => [...prev, ...compressed])
     } catch {
       setError('Failed to process image. Please try another one.')
     }
   }
 
-  const removeImage = () => setImagePreview('')
+  const handleImageChange = async (e) => {
+    await appendImages(e.target.files)
+    e.target.value = ''
+  }
+
+  const removeImage = (index) => {
+    setImagePreviews((prev) => prev.filter((_, idx) => idx !== index))
+  }
 
   const handleDrag = (e) => {
     e.preventDefault()
@@ -298,20 +314,7 @@ function ShipmentForm({ title, description }) {
     e.preventDefault()
     e.stopPropagation()
     setDragActive(false)
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0]
-      if (!file.type.startsWith('image/')) {
-        setError('Please drop an image file.')
-        return
-      }
-      try {
-        const compressedBase64 = await compressImage(file)
-        setImagePreview(compressedBase64)
-      } catch {
-        setError('Failed to process dropped image.')
-      }
-    }
+    await appendImages(e.dataTransfer.files)
   }
 
   const handleSubmit = async (e) => {
@@ -326,7 +329,7 @@ function ShipmentForm({ title, description }) {
         ...formData,
         tracking_id: newTrackingId,
         status: 'processing',
-        package_image: imagePreview || null,
+        package_image: serializeDeliveryImages(imagePreviews),
         sender_email: user?.email || formData.sender_email || null
       }
 
@@ -363,7 +366,7 @@ function ShipmentForm({ title, description }) {
         delivery_language: 'en',
         delivery_notes: ''
       })
-      setImagePreview('')
+      setImagePreviews([])
     } catch (err) {
       setError(err.message || 'Failed to register delivery. Please try again.')
     } finally {
@@ -707,48 +710,58 @@ function ShipmentForm({ title, description }) {
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-[11px] font-black uppercase tracking-wider text-primary">Package Image</label>
+              <div className="flex items-center justify-between gap-3">
+                <label className="block text-[11px] font-black uppercase tracking-wider text-primary">Package Images</label>
+                <span className="text-[10px] font-black uppercase tracking-wider text-text-muted">{imagePreviews.length}/4</span>
+              </div>
 
-              {imagePreview ? (
-                <div className="relative rounded-2xl overflow-hidden border border-border bg-white p-2 flex items-center justify-between">
+              <div
+                onDragEnter={handleDrag}
+                onDragOver={handleDrag}
+                onDragLeave={handleDrag}
+                onDrop={handleDrop}
+                className={`border border-dashed rounded-2xl px-4 py-4 transition-colors ${
+                  dragActive ? 'border-border-active bg-black/5' : 'border-border bg-white hover:bg-black/5'
+                }`}
+              >
+                <label className={`block ${imagePreviews.length >= 4 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    disabled={imagePreviews.length >= 4}
+                    className="hidden"
+                    onChange={handleImageChange}
+                  />
                   <div className="flex items-center gap-3">
-                    <img src={imagePreview} alt="Upload Preview" className="w-14 h-14 rounded-xl object-cover border border-border" />
+                    <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center text-white">
+                      <Upload size={18} />
+                    </div>
                     <div>
-                      <p className="text-sm font-black text-primary">Attachment Ready</p>
-                      <p className="text-xs text-text-muted font-semibold">Compressed image</p>
+                      <p className="text-sm font-black text-primary">
+                        {imagePreviews.length >= 4 ? 'Maximum of 4 images reached' : 'Upload images or drag files'}
+                      </p>
+                      <p className="text-xs text-text-muted font-semibold mt-0.5">JPG, PNG (auto-compressed)</p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={removeImage}
-                    className="p-2 bg-primary text-white rounded-xl transition-colors hover:bg-black"
-                    title="Remove Image"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              ) : (
-                <div
-                  onDragEnter={handleDrag}
-                  onDragOver={handleDrag}
-                  onDragLeave={handleDrag}
-                  onDrop={handleDrop}
-                  className={`border border-dashed rounded-2xl px-4 py-4 transition-colors ${
-                    dragActive ? 'border-border-active bg-black/5' : 'border-border bg-white hover:bg-black/5'
-                  }`}
-                >
-                  <label className="cursor-pointer block">
-                    <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center text-white">
-                        <Upload size={18} />
-                      </div>
-                      <div>
-                        <p className="text-sm font-black text-primary">Upload image or drag file</p>
-                        <p className="text-xs text-text-muted font-semibold mt-0.5">JPG, PNG (auto-compressed)</p>
-                      </div>
+                </label>
+              </div>
+
+              {imagePreviews.length > 0 && (
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  {imagePreviews.map((src, index) => (
+                    <div key={`${src}-${index}`} className="relative rounded-2xl overflow-hidden border border-border bg-white">
+                      <img src={src} alt={`Upload ${index + 1}`} className="w-full h-24 object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(index)}
+                        className="absolute top-2 right-2 p-2 bg-primary text-white rounded-xl transition-colors hover:bg-black"
+                        title="Remove Image"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
-                  </label>
+                  ))}
                 </div>
               )}
             </div>

@@ -74,7 +74,7 @@ function Login() {
   }
 
   return (
-    <section className="bg-background min-h-[100dvh] w-full overflow-hidden flex items-center justify-center">
+    <section className="relative bg-background min-h-[100dvh] w-full overflow-hidden flex items-center justify-center">
       <div className="w-full max-w-md px-6">
         <div className="bg-white flex flex-col items-center gap-y-8 rounded-3xl border border-border px-6 sm:px-8 py-8 sm:py-10 shadow-2xl">
           <div className="flex flex-col items-center gap-y-4 text-center">
@@ -144,6 +144,16 @@ function Login() {
               </button>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="absolute inset-x-0 bottom-4 px-6">
+        <div className="max-w-md mx-auto text-center text-[11px] text-text-muted font-semibold leading-relaxed">
+          <a href="tel:+447385284814" className="font-black text-primary hover:text-black transition-colors">
+            +44 7385284814
+          </a>
+          <span className="mx-2">•</span>
+          <span>123 Mabini Street, Barangay San Isidro, Quezon City, Metro Manila 🇵🇭</span>
         </div>
       </div>
     </section>
