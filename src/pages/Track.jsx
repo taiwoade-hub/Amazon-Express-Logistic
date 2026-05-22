@@ -84,66 +84,69 @@ function Track() {
   const currentStatusIndex = getCurrentStatusIndex()
 
   return (
-    <main className="min-h-screen py-12 px-6 max-w-5xl mx-auto bg-background">
-      
-      {/* Back button */}
-      <div className="mb-8">
-        <Link to="/" className="inline-flex items-center gap-2 text-xs font-black text-primary hover:text-black transition-colors">
-          <ArrowLeft size={14} />
-          <span>Back to Home</span>
-        </Link>
+    <main className="relative overflow-hidden bg-background min-h-screen">
+      <div className="absolute inset-0 z-0 pointer-events-none">
+        <div
+          className="absolute inset-0 bg-cover bg-center lg:bg-fixed"
+          style={{ backgroundImage: 'url(/track-bg.jpg)' }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-white/80 via-white/75 to-white/90" />
       </div>
 
-      <div className="mb-10 text-center sm:text-left">
-        <h1 className="text-3xl sm:text-4xl font-black text-primary tracking-tight">Track Package</h1>
-        <p className="text-text-muted mt-1 font-semibold">Verify shipment milestones and delivery status instantly.</p>
-      </div>
+      <div className="relative z-10 max-w-5xl mx-auto py-12 px-6">
+        <div className="mb-8">
+          <Link to="/" className="inline-flex items-center gap-2 text-xs font-black text-primary hover:text-black transition-colors">
+            <ArrowLeft size={14} />
+            <span>Back to Home</span>
+          </Link>
+        </div>
 
-      {/* Search Input Widget */}
-      <form onSubmit={handleSearch} className="mb-12">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-grow">
-            <span className="absolute inset-y-0 left-0 pl-5 flex items-center text-text-muted">
-              <Search size={18} />
-            </span>
-            <input
-              type="text"
-              value={trackingId}
-              onChange={(e) => setTrackingId(e.target.value.toUpperCase())}
-              placeholder="Enter tracking ID (e.g. AXL-123456)"
-              className="w-full pl-12 pr-5 py-4 bg-white border border-border rounded-2xl focus:outline-none focus:border-border-active transition-colors text-base placeholder-black/30 text-primary font-semibold"
-            />
+        <div className="mb-10 text-center sm:text-left">
+          <h1 className="text-3xl sm:text-4xl font-black text-primary tracking-tight">Track Package</h1>
+          <p className="text-text-muted mt-1 font-semibold">Verify shipment milestones and delivery status instantly.</p>
+        </div>
+
+        <form onSubmit={handleSearch} className="mb-12">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-grow">
+              <span className="absolute inset-y-0 left-0 pl-5 flex items-center text-text-muted">
+                <Search size={18} />
+              </span>
+              <input
+                type="text"
+                value={trackingId}
+                onChange={(e) => setTrackingId(e.target.value.toUpperCase())}
+                placeholder="Enter tracking ID (e.g. AXL-123456)"
+                className="w-full pl-12 pr-5 py-4 bg-white border border-border rounded-2xl focus:outline-none focus:border-border-active transition-colors text-base placeholder-black/30 text-primary font-semibold"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="bg-primary hover:bg-black text-white px-8 py-4 rounded-2xl font-black transition-colors disabled:opacity-50 active:scale-95"
+            >
+              {loading ? 'Searching...' : 'Track parcel'}
+            </button>
           </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="bg-primary hover:bg-black text-white px-8 py-4 rounded-2xl font-black transition-colors disabled:opacity-50 active:scale-95"
-          >
-            {loading ? 'Searching...' : 'Track parcel'}
-          </button>
-        </div>
-      </form>
+        </form>
 
-      {/* Error Card */}
-      {error && (
-        <div className="bg-primary rounded-2xl p-5 mb-8 flex gap-3 items-start text-white">
-          <AlertCircle size={20} className="text-white flex-shrink-0 mt-0.5" />
-          <p className="text-sm font-black leading-snug">{error}</p>
-        </div>
-      )}
+        {error && (
+          <div className="bg-primary rounded-2xl p-5 mb-8 flex gap-3 items-start text-white">
+            <AlertCircle size={20} className="text-white flex-shrink-0 mt-0.5" />
+            <p className="text-sm font-black leading-snug">{error}</p>
+          </div>
+        )}
 
-      {/* Landing page placeholder */}
-      {!searched && !delivery && (
-        <div className="text-center py-16 glass-panel rounded-3xl bg-white">
-          <Package className="w-16 h-16 mx-auto mb-4 text-primary opacity-15" />
-          <p className="font-black text-primary text-sm uppercase tracking-wider">Waiting for Tracking Input</p>
-          <p className="text-xs text-text-muted font-semibold mt-2 max-w-xs mx-auto">Enter a valid tracking ID above to retrieve your delivery timeline.</p>
-        </div>
-      )}
+        {!searched && !delivery && (
+          <div className="text-center py-16 glass-panel rounded-3xl bg-white">
+            <Package className="w-16 h-16 mx-auto mb-4 text-primary opacity-15" />
+            <p className="font-black text-primary text-sm uppercase tracking-wider">Waiting for Tracking Input</p>
+            <p className="text-xs text-text-muted font-semibold mt-2 max-w-xs mx-auto">Enter a valid tracking ID above to retrieve your delivery timeline.</p>
+          </div>
+        )}
 
-      {/* Tracking results view */}
-      {delivery && (
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-8 items-start">
+        {delivery && (
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-8 items-start">
           
           {/* Left panel: Details & Picture */}
           <div className="md:col-span-2 space-y-6">
@@ -281,9 +284,9 @@ function Track() {
 
           </div>
 
-        </div>
-      )}
-
+          </div>
+        )}
+      </div>
     </main>
   )
 }

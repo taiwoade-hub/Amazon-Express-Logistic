@@ -15,6 +15,11 @@ CREATE TABLE IF NOT EXISTS deliveries (
   updated_at TIMESTAMP DEFAULT now()
 );
 
+ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS pickup_country TEXT;
+ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS destination_country TEXT;
+ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS delivery_language TEXT;
+ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS delivery_notes TEXT;
+
 -- Create index on tracking_id for faster searches
 CREATE INDEX IF NOT EXISTS idx_tracking_id ON deliveries(tracking_id);
 
@@ -36,6 +41,21 @@ DROP POLICY IF EXISTS "Allow public update" ON public.deliveries;
 DROP POLICY IF EXISTS "Allow public update" ON deliveries;
 CREATE POLICY "Allow public update" ON deliveries
   FOR UPDATE USING (true) WITH CHECK (true);
+
+CREATE TABLE IF NOT EXISTS address_book (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  owner_email TEXT NOT NULL,
+  label TEXT NOT NULL,
+  location TEXT NOT NULL,
+  country TEXT,
+  created_at TIMESTAMP DEFAULT now()
+);
+
+ALTER TABLE address_book ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow address book owner access" ON address_book;
+CREATE POLICY "Allow address book owner access" ON address_book
+  FOR ALL USING ((auth.jwt() ->> 'email') = owner_email) WITH CHECK ((auth.jwt() ->> 'email') = owner_email);
 
 CREATE TABLE IF NOT EXISTS app_settings (
   key TEXT PRIMARY KEY,

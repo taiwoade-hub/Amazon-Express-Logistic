@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { Copy, Check, Upload, Trash2, Phone, MapPin, Package, AlertCircle } from 'lucide-react'
+import { COUNTRIES } from '../lib/countries'
+import { DELIVERY_LANGUAGES } from '../lib/deliveryLanguages'
 
 function generateTrackingId() {
   const random = Math.floor(Math.random() * 1000000)
@@ -18,20 +20,213 @@ function ShipmentForm({ title, description }) {
   const [error, setError] = useState('')
   const [imagePreview, setImagePreview] = useState('')
   const [dragActive, setDragActive] = useState(false)
+  const [savedAddresses, setSavedAddresses] = useState([])
+  const [pickupSavedId, setPickupSavedId] = useState('')
+  const [destinationSavedId, setDestinationSavedId] = useState('')
 
   const [formData, setFormData] = useState({
     sender_name: user?.name || '',
     sender_email: user?.email || '',
     receiver_name: '',
     pickup_location: '',
+    pickup_country: '',
     destination: '',
+    destination_country: '',
     phone: '',
-    package_type: 'standard'
+    package_type: 'standard',
+    delivery_language: 'en',
+    delivery_notes: ''
   })
+
+  useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      sender_name: user?.name || '',
+      sender_email: user?.email || ''
+    }))
+  }, [user])
+
+  useEffect(() => {
+    const load = async () => {
+      if (!user?.email) {
+        setSavedAddresses([])
+        setPickupSavedId('')
+        setDestinationSavedId('')
+        return
+      }
+
+      const storageKey = `axl_address_book_${user.email}`
+      const readLocal = () => {
+        try {
+          const raw = localStorage.getItem(storageKey)
+          const parsed = JSON.parse(raw || '[]')
+          return Array.isArray(parsed) ? parsed : []
+        } catch {
+          return []
+        }
+      }
+
+      const writeLocal = (value) => {
+        localStorage.setItem(storageKey, JSON.stringify(value))
+      }
+
+      const fallbackLocal = () => {
+        const local = readLocal()
+        const normalized = local.slice(0, 10).map((item) => ({
+          id: String(item.id || ''),
+          label: String(item.label || ''),
+          location: String(item.location || ''),
+          country: String(item.country || '')
+        })).filter((item) => item.id && item.location)
+        writeLocal(normalized)
+        setSavedAddresses(normalized)
+      }
+
+      if (supabase.isMock) {
+        fallbackLocal()
+        return
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('address_book')
+          .select('id,label,location,country,created_at')
+          .eq('owner_email', user.email)
+          .order('created_at', { ascending: false })
+          .limit(10)
+        if (error) throw error
+        const normalized = (data || []).map((item) => ({
+          id: String(item.id || ''),
+          label: String(item.label || ''),
+          location: String(item.location || ''),
+          country: String(item.country || '')
+        })).filter((item) => item.id && item.location)
+        setSavedAddresses(normalized)
+      } catch {
+        fallbackLocal()
+      }
+    }
+
+    load()
+  }, [user?.email])
 
   const handleChange = (e) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const autoLabel = (prefix, location, country) => {
+    const base = String(location || '').trim().replace(/\s+/g, ' ')
+    const short = base.length > 26 ? `${base.slice(0, 26)}…` : base
+    const suffix = country ? ` (${country})` : ''
+    return `${prefix}: ${short || 'Address'}${suffix}`
+  }
+
+  const saveAddress = async (prefix, location, country) => {
+    if (!user?.email) {
+      setError('Please sign in to save pinned addresses.')
+      return
+    }
+
+    const cleanLocation = String(location || '').trim()
+    if (!cleanLocation) {
+      setError('Please enter an address before saving it.')
+      return
+    }
+
+    if (savedAddresses.length >= 10) {
+      setError('You can save up to 10 pinned addresses.')
+      return
+    }
+
+    setError('')
+    const label = autoLabel(prefix, cleanLocation, country)
+
+    const storageKey = `axl_address_book_${user.email}`
+    const readLocal = () => {
+      try {
+        const raw = localStorage.getItem(storageKey)
+        const parsed = JSON.parse(raw || '[]')
+        return Array.isArray(parsed) ? parsed : []
+      } catch {
+        return []
+      }
+    }
+    const writeLocal = (value) => {
+      localStorage.setItem(storageKey, JSON.stringify(value))
+      setSavedAddresses(value)
+    }
+
+    if (supabase.isMock) {
+      const local = readLocal()
+      const next = [
+        { id: `local_${Date.now()}_${Math.random().toString(16).slice(2)}`, label, location: cleanLocation, country: country || '' },
+        ...local
+      ].slice(0, 10)
+      writeLocal(next)
+      return
+    }
+
+    try {
+      const { error } = await supabase.from('address_book').insert([
+        { owner_email: user.email, label, location: cleanLocation, country: country || null }
+      ])
+      if (error) throw error
+      const { data, error: reloadError } = await supabase
+        .from('address_book')
+        .select('id,label,location,country,created_at')
+        .eq('owner_email', user.email)
+        .order('created_at', { ascending: false })
+        .limit(10)
+      if (reloadError) throw reloadError
+      setSavedAddresses((data || []).map((item) => ({
+        id: String(item.id || ''),
+        label: String(item.label || ''),
+        location: String(item.location || ''),
+        country: String(item.country || '')
+      })).filter((item) => item.id && item.location))
+    } catch {
+      const local = readLocal()
+      const next = [
+        { id: `local_${Date.now()}_${Math.random().toString(16).slice(2)}`, label, location: cleanLocation, country: country || '' },
+        ...local
+      ].slice(0, 10)
+      writeLocal(next)
+    }
+  }
+
+  const deleteAddress = async (id) => {
+    if (!user?.email || !id) return
+
+    const storageKey = `axl_address_book_${user.email}`
+    const readLocal = () => {
+      try {
+        const raw = localStorage.getItem(storageKey)
+        const parsed = JSON.parse(raw || '[]')
+        return Array.isArray(parsed) ? parsed : []
+      } catch {
+        return []
+      }
+    }
+    const writeLocal = (value) => {
+      localStorage.setItem(storageKey, JSON.stringify(value))
+      setSavedAddresses(value)
+    }
+
+    if (supabase.isMock || String(id).startsWith('local_')) {
+      const next = readLocal().filter((item) => String(item.id) !== String(id))
+      writeLocal(next)
+      return
+    }
+
+    try {
+      const { error } = await supabase.from('address_book').delete().eq('id', id).eq('owner_email', user.email)
+      if (error) throw error
+      setSavedAddresses((prev) => prev.filter((item) => String(item.id) !== String(id)))
+    } catch {
+      const next = readLocal().filter((item) => String(item.id) !== String(id))
+      writeLocal(next)
+    }
   }
 
   const compressImage = (file) => {
@@ -138,9 +333,14 @@ function ShipmentForm({ title, description }) {
       const { error: insertError } = await supabase.from('deliveries').insert([payload])
       if (insertError) {
         const message = String(insertError.message || '')
-        if (message.toLowerCase().includes('package_image') && (message.toLowerCase().includes('schema') || message.toLowerCase().includes('column'))) {
+        const lower = message.toLowerCase()
+        if (lower.includes('schema') || lower.includes('column')) {
           const fallbackPayload = { ...payload }
           delete fallbackPayload.package_image
+          delete fallbackPayload.pickup_country
+          delete fallbackPayload.destination_country
+          delete fallbackPayload.delivery_language
+          delete fallbackPayload.delivery_notes
           const { error: fallbackError } = await supabase.from('deliveries').insert([fallbackPayload])
           if (fallbackError) throw fallbackError
         } else {
@@ -155,9 +355,13 @@ function ShipmentForm({ title, description }) {
         sender_email: user?.email || '',
         receiver_name: '',
         pickup_location: '',
+        pickup_country: '',
         destination: '',
+        destination_country: '',
         phone: '',
-        package_type: 'standard'
+        package_type: 'standard',
+        delivery_language: 'en',
+        delivery_notes: ''
       })
       setImagePreview('')
     } catch (err) {
@@ -304,6 +508,54 @@ function ShipmentForm({ title, description }) {
                   className="w-full pl-11 pr-4 py-3 rounded-xl border border-border focus:outline-none focus:border-border-active text-sm font-semibold"
                 />
               </div>
+              {user ? (
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2">
+                  <select
+                    value={pickupSavedId}
+                    onChange={(e) => {
+                      const id = e.target.value
+                      setPickupSavedId(id)
+                      const found = savedAddresses.find((item) => String(item.id) === String(id))
+                      if (found) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          pickup_location: found.location,
+                          pickup_country: found.country || prev.pickup_country
+                        }))
+                      }
+                    }}
+                    className="w-full px-4 py-3 rounded-xl border border-border focus:outline-none focus:border-border-active text-sm font-semibold bg-white"
+                  >
+                    <option value="">Use pinned pickup address</option>
+                    {savedAddresses.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.label || item.location}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => saveAddress('Pickup', formData.pickup_location, formData.pickup_country)}
+                    className="px-4 py-3 rounded-xl bg-primary text-white font-black text-sm hover:bg-black transition-colors"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!pickupSavedId}
+                    onClick={() => {
+                      deleteAddress(pickupSavedId)
+                      setPickupSavedId('')
+                    }}
+                    className="px-4 py-3 rounded-xl bg-white border border-border text-primary font-black text-sm hover:bg-black/5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    title="Remove pinned address"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-text-muted font-semibold">Sign in to save and use pinned addresses.</p>
+              )}
             </div>
 
             <div className="space-y-1.5">
@@ -322,6 +574,88 @@ function ShipmentForm({ title, description }) {
                   className="w-full pl-11 pr-4 py-3 rounded-xl border border-border focus:outline-none focus:border-border-active text-sm font-semibold"
                 />
               </div>
+              {user ? (
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2">
+                  <select
+                    value={destinationSavedId}
+                    onChange={(e) => {
+                      const id = e.target.value
+                      setDestinationSavedId(id)
+                      const found = savedAddresses.find((item) => String(item.id) === String(id))
+                      if (found) {
+                        setFormData((prev) => ({
+                          ...prev,
+                          destination: found.location,
+                          destination_country: found.country || prev.destination_country
+                        }))
+                      }
+                    }}
+                    className="w-full px-4 py-3 rounded-xl border border-border focus:outline-none focus:border-border-active text-sm font-semibold bg-white"
+                  >
+                    <option value="">Use pinned destination address</option>
+                    {savedAddresses.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.label || item.location}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => saveAddress('Destination', formData.destination, formData.destination_country)}
+                    className="px-4 py-3 rounded-xl bg-primary text-white font-black text-sm hover:bg-black transition-colors"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!destinationSavedId}
+                    onClick={() => {
+                      deleteAddress(destinationSavedId)
+                      setDestinationSavedId('')
+                    }}
+                    className="px-4 py-3 rounded-xl bg-white border border-border text-primary font-black text-sm hover:bg-black/5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    title="Remove pinned address"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-black uppercase tracking-wider text-primary">Pickup Country</label>
+              <select
+                name="pickup_country"
+                value={formData.pickup_country}
+                onChange={handleChange}
+                required
+                className="w-full px-4 py-3 rounded-xl border border-border focus:outline-none focus:border-border-active text-sm font-semibold bg-white"
+              >
+                <option value="">Select country</option>
+                {COUNTRIES.map((country) => (
+                  <option key={country.code} value={country.code}>
+                    {country.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-black uppercase tracking-wider text-primary">Destination Country</label>
+              <select
+                name="destination_country"
+                value={formData.destination_country}
+                onChange={handleChange}
+                required
+                className="w-full px-4 py-3 rounded-xl border border-border focus:outline-none focus:border-border-active text-sm font-semibold bg-white"
+              >
+                <option value="">Select country</option>
+                {COUNTRIES.map((country) => (
+                  <option key={country.code} value={country.code}>
+                    {country.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="space-y-1.5">
@@ -342,6 +676,34 @@ function ShipmentForm({ title, description }) {
                   <option value="hazardous">Hazardous</option>
                 </select>
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-black uppercase tracking-wider text-primary">Delivery Notes Language</label>
+              <select
+                name="delivery_language"
+                value={formData.delivery_language}
+                onChange={handleChange}
+                className="w-full px-4 py-3 rounded-xl border border-border focus:outline-none focus:border-border-active text-sm font-semibold bg-white"
+              >
+                {DELIVERY_LANGUAGES.map((language) => (
+                  <option key={language.code} value={language.code}>
+                    {language.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5 sm:col-span-2">
+              <label className="block text-[11px] font-black uppercase tracking-wider text-primary">Delivery Notes (Optional)</label>
+              <textarea
+                name="delivery_notes"
+                value={formData.delivery_notes}
+                onChange={handleChange}
+                rows={4}
+                placeholder="Add any delivery instructions (gate code, safe place, call on arrival, etc.)"
+                className="w-full px-4 py-3 rounded-xl border border-border focus:outline-none focus:border-border-active text-sm font-semibold resize-none"
+              />
             </div>
 
             <div className="space-y-1.5">

@@ -45,45 +45,54 @@ function App() {
   return (
     <AuthProvider>
       <HashRouter>
-        <div className="min-h-screen bg-background text-text flex flex-col">
-          <Navbar />
-          <div className="flex-grow pb-24 md:pb-0">
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/send" element={<SendPackage />} />
-              <Route 
-                path="/track" 
-                element={
-                  <ProtectedUserRoute>
-                    <Track />
-                  </ProtectedUserRoute>
-                } 
-              />
-              <Route path="/login" element={<Login />} />
-              <Route 
-                path="/dashboard" 
-                element={
-                  <ProtectedUserRoute>
-                    <Dashboard />
-                  </ProtectedUserRoute>
-                } 
-              />
-              <Route 
-                path="/admin" 
-                element={
-                  <ProtectedAdminRoute>
-                    <Admin />
-                  </ProtectedAdminRoute>
-                } 
-              />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </div>
-          <MobileTabBar />
-        </div>
+        <AppLayout />
       </HashRouter>
     </AuthProvider>
   )
 }
 
 export default App
+
+function AppLayout() {
+  const location = useLocation()
+  const isAuthPage = location.pathname === '/login'
+
+  return (
+    <div className="min-h-screen bg-background text-text flex flex-col">
+      <Navbar />
+      <div className={`flex-grow ${isAuthPage ? 'pb-0 overflow-hidden' : 'pb-24 md:pb-0'}`}>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/send" element={<SendPackage />} />
+          <Route
+            path="/track"
+            element={
+              <ProtectedUserRoute>
+                <Track />
+              </ProtectedUserRoute>
+            }
+          />
+          <Route path="/login" element={<Login />} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedUserRoute>
+                <Dashboard />
+              </ProtectedUserRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedAdminRoute>
+                <Admin />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </div>
+      <MobileTabBar />
+    </div>
+  )
+}

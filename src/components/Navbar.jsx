@@ -11,6 +11,8 @@ function Navbar() {
   const navigate = useNavigate()
   const location = useLocation()
 
+  if (location.pathname === '/login') return null;
+
   const handleLogout = () => {
     logout()
     setMobileMenuOpen(false)
@@ -49,8 +51,9 @@ function Navbar() {
       <nav className="bg-white/90 backdrop-blur border-b border-border">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           
-          <Link to="/" className="font-black text-xl text-primary tracking-tight">
-            amazonlogisics.com
+          <Link to="/" className="flex items-center gap-3 font-black text-primary tracking-tight">
+            <img src="/logo.svg" alt="Amazon Logistics Logo" className="w-8 h-8" />
+            <span className="text-base sm:text-xl truncate max-w-[180px]">amazonlogisics.com</span>
           </Link>
 
           {/* Desktop Links */}

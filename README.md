@@ -12,6 +12,9 @@ It allows users to send packages, generate tracking IDs, and track deliveries in
 - Auto-generated tracking IDs
 - Real-time shipment tracking
 - View delivery status updates with timeline visualization
+- Pickup & destination country selectors
+- Delivery notes + delivery notes language
+- Pinned/frequent addresses (up to 10, saved per user when database table exists with safe local fallback)
 
 ### 🧑‍💼 Admin Features
 - View all deliveries in a dashboard table
@@ -50,18 +53,37 @@ CREATE TABLE deliveries (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   tracking_id TEXT UNIQUE NOT NULL,
   sender_name TEXT NOT NULL,
+  sender_email TEXT,
   receiver_name TEXT NOT NULL,
   pickup_location TEXT NOT NULL,
+  pickup_country TEXT,
   destination TEXT NOT NULL,
+  destination_country TEXT,
   phone TEXT NOT NULL,
   package_type TEXT NOT NULL,
   status TEXT DEFAULT 'processing',
+  package_image TEXT,
+  delivery_language TEXT,
+  delivery_notes TEXT,
   created_at TIMESTAMP DEFAULT now(),
   updated_at TIMESTAMP DEFAULT now()
 );
 ```
 
 **Status Values**: `processing`, `picked_up`, `in_transit`, `delivered`
+
+### Table: `address_book` (Pinned Addresses)
+
+```sql
+CREATE TABLE address_book (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  owner_email TEXT NOT NULL,
+  label TEXT NOT NULL,
+  location TEXT NOT NULL,
+  country TEXT,
+  created_at TIMESTAMP DEFAULT now()
+);
+```
 
 ---
 
@@ -85,6 +107,7 @@ Get these values from your Supabase project settings.
 3. In the SQL Editor, run the schema creation script:
    - Copy the SQL from `src/lib/createSchema.sql`
    - Execute it in your Supabase SQL Editor
+   - Run it again anytime you pull updates (it uses `IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`)
 4. Copy your API keys:
    - Go to Settings → API
    - Copy `Project URL` and `anon public` key
@@ -108,6 +131,8 @@ src/
  ├── lib/
  │    ├── supabaseClient.js        # Supabase client initialization
  │    └── createSchema.sql         # Database schema
+ │    └── countries.js             # Country list for dropdowns
+ │    └── deliveryLanguages.js     # Delivery-notes language list
  │
  ├── App.jsx                        # Main app with routing
  ├── main.jsx                       # React entry point
@@ -160,7 +185,7 @@ Timeline visualization shows active and completed steps.
 git clone <your-repo>
 
 # 2. Install dependencies
-pnpm install
+npm install
 
 # 3. Create .env file with Supabase keys
 cp .env.example .env
@@ -172,7 +197,7 @@ cp .env.example .env
 # - Execute
 
 # 5. Start development server
-pnpm dev
+npm run dev
 
 # 6. Open http://localhost:5173 in your browser
 ```
@@ -183,10 +208,10 @@ pnpm dev
 
 ```bash
 # Build for production
-pnpm build
+npm run build
 
 # Preview build locally
-pnpm preview
+npm run preview
 ```
 
 Output will be in the `dist/` folder.
@@ -206,9 +231,17 @@ All components use Tailwind CSS with rounded corners (`rounded-xl`), soft border
 
 ---
 
+## 🖼️ UI Updates
+
+- Home page background image: `public/home-bg.jpg`
+- Track page background image: `public/track-bg.jpg`
+- Auth page (Sign In / Sign Up) is full-viewport, centered, and non-scrollable (Amazon-style)
+
+---
+
 ## 🧪 Future Improvements
 
-- User authentication with Supabase Auth
+- Stronger Supabase RLS policies for production hardening
 - Map-based delivery tracking
 - SMS/Email notifications
 - Rider assignment system

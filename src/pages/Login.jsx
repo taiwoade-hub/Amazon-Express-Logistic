@@ -74,27 +74,25 @@ function Login() {
   }
 
   return (
-    <section className="bg-background h-[100svh] overflow-hidden">
-      <div className="flex h-[100svh] items-center justify-center px-6">
-        <div className="bg-white flex w-full max-w-sm flex-col items-center gap-y-8 rounded-3xl border border-border px-6 py-12 shadow-xl max-h-[calc(100svh-48px)] overflow-auto">
-          <div className="flex flex-col items-center gap-y-3">
-            <Link to="/" className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center text-white">
-                <Truck size={20} />
-              </div>
-              <span className="font-black text-primary tracking-tight">amazonlogisics.com</span>
+    <section className="bg-background min-h-[100dvh] w-full overflow-hidden flex items-center justify-center">
+      <div className="w-full max-w-md px-6">
+        <div className="bg-white flex flex-col items-center gap-y-8 rounded-3xl border border-border px-6 sm:px-8 py-8 sm:py-10 shadow-2xl">
+          <div className="flex flex-col items-center gap-y-4 text-center">
+            <Link to="/" className="flex flex-col items-center gap-3 mb-2 hover:opacity-90 transition-opacity">
+              <img src="/logo.svg" alt="Amazon Logistics Logo" className="w-14 h-14" />
+              <span className="font-black text-primary tracking-tight text-lg">amazonlogisics.com</span>
             </Link>
             <h1 className="text-3xl font-black tracking-tight text-primary">
               {isLogin ? 'Welcome Back' : 'Create an account'}
             </h1>
-            <p className="text-text-muted text-sm font-semibold">
+            <p className="text-text-muted text-sm font-medium px-4">
               {isLogin ? 'Login to manage deliveries and tracking.' : 'Sign up to save and track all your deliveries.'}
             </p>
           </div>
 
-          <div className="flex w-full flex-col gap-4">
+          <div className="flex w-full flex-col gap-5">
             {error && (
-              <div className="w-full rounded-2xl bg-primary text-white px-4 py-3 text-sm font-black">
+              <div className="w-full rounded-2xl bg-red-50 text-red-600 px-4 py-3 text-sm font-semibold border border-red-100 text-center">
                 {error}
               </div>
             )}
@@ -107,14 +105,16 @@ function Login() {
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  className="h-12 rounded-xl border-border bg-gray-50/50"
                 />
               )}
               <Input
                 type="email"
-                placeholder="Email"
+                placeholder="Email Address"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                className="h-12 rounded-xl border-border bg-gray-50/50"
               />
               <Input
                 type="password"
@@ -122,26 +122,25 @@ function Login() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                className="h-12 rounded-xl border-border bg-gray-50/50"
               />
 
-              <div className="flex flex-col gap-3">
-                <Button type="submit" disabled={loading} className="w-full">
-                  {loading ? 'Please wait...' : isLogin ? 'Login' : 'Create an account'}
-                </Button>
-              </div>
+              <Button type="submit" disabled={loading} className="w-full h-12 text-base font-bold rounded-xl mt-2 shadow-md hover:shadow-lg transition-all">
+                {loading ? 'Please wait...' : isLogin ? 'Sign In' : 'Create Account'}
+              </Button>
             </form>
 
-            <div className="text-text-muted flex justify-center gap-1 text-sm font-semibold">
-              <p>{isLogin ? "Don't have an account?" : 'Already have an account?'}</p>
+            <div className="text-text-muted flex justify-center gap-2 text-sm font-medium mt-2">
+              <span>{isLogin ? "Don't have an account?" : 'Already have an account?'}</span>
               <button
                 type="button"
                 onClick={() => {
                   setIsLogin(!isLogin)
                   setError('')
                 }}
-                className="text-primary font-black hover:underline"
+                className="text-primary font-bold hover:underline transition-all"
               >
-                {isLogin ? 'Sign up' : 'Login'}
+                {isLogin ? 'Sign up' : 'Log in'}
               </button>
             </div>
           </div>
