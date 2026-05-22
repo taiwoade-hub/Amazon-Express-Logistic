@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="black">
+  <!-- Speed lines -->
+  <rect x="90" y="250" width="30" height="15" rx="5" />
+  <rect x="70" y="290" width="50" height="15" rx="5" />
+  <rect x="100" y="380" width="290" height="8" rx="4" />
+  
+  <!-- Truck Body -->
+  <path d="M120 180 h220 v190 h-220 z" />
+  
+  <!-- Truck Cabin -->
+  <path d="M350 230 h50 l40 60 v80 h-90 z" />
+  
+  <!-- Window -->
+  <path d="M360 240 h30 l20 30 h-50 z" fill="white" />
+  
+  <!-- Wheels -->
+  <circle cx="160" cy="350" r="30" fill="black" stroke="white" stroke-width="10" />
+  <circle cx="360" cy="350" r="30" fill="black" stroke="white" stroke-width="10" />
+  <circle cx="160" cy="350" r="10" fill="white" />
+  <circle cx="360" cy="350" r="10" fill="white" />
+  
+  <!-- Clock -->
+  <circle cx="260" cy="160" r="60" fill="black" stroke="white" stroke-width="5" />
+  <path d="M260 120 v40 l25 15" stroke="white" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+</svg>
