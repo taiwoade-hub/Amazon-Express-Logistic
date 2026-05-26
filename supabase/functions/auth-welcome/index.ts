@@ -12,7 +12,9 @@ Deno.serve(async (req) => {
 
     const service = createSupabaseServiceClient()
     const userClient = createSupabaseUserClient(req)
-    const { data, error } = await userClient.auth.getUser()
+    const auth = req.headers.get('authorization') || ''
+    const token = auth.replace(/^Bearer\s+/i, '').trim()
+    const { data, error } = await userClient.auth.getUser(token || undefined)
 
     const email = String(data?.user?.email || '').trim().toLowerCase()
     if (error || !email) return json({ error: 'Unauthorized' }, { status: 401 })

@@ -32,8 +32,6 @@ Deno.serve(async (req) => {
     if (req.method !== 'POST') return json({ error: 'Method not allowed' }, { status: 405 })
 
     const service = createSupabaseServiceClient()
-    const requesterEmail = await getUserEmailFromRequest(req)
-    if (!requesterEmail) return json({ error: 'Unauthorized' }, { status: 401 })
 
     const body = await req.json().catch(() => null) as { trackingId?: string } | null
     const trackingId = String(body?.trackingId || '').trim().toUpperCase()
@@ -50,9 +48,14 @@ Deno.serve(async (req) => {
     const senderEmail = String(delivery.sender_email || '').trim().toLowerCase()
     const adminEmail = (await getAdminEmail(service)) || (Deno.env.get('ADMIN_EMAIL') || 'admin@gmail.com').trim().toLowerCase()
 
+    const requesterEmail = await getUserEmailFromRequest(req)
     const isAdminCaller = requesterEmail && adminEmail && requesterEmail === adminEmail
     const isOwnerCaller = senderEmail && requesterEmail === senderEmail
-    if (!isAdminCaller && !isOwnerCaller) return json({ error: 'Forbidden' }, { status: 403 })
+    const isRecent = delivery.created_at && (Date.now() - new Date(delivery.created_at).getTime()) < 10 * 60 * 1000 // 10 minutes
+
+    if (!isAdminCaller && !isOwnerCaller && !isRecent) {
+      return json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     if (!senderEmail) return json({ error: 'Sender email is missing for this delivery' }, { status: 400 })
 

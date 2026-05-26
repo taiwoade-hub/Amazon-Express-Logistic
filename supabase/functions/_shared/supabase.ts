@@ -20,8 +20,11 @@ export function createSupabaseUserClient(req: Request) {
 }
 
 export async function getUserEmailFromRequest(req: Request) {
+  const auth = req.headers.get('authorization') || ''
+  const token = auth.replace(/^Bearer\s+/i, '').trim()
+  if (!token) return ''
   const supabase = createSupabaseUserClient(req)
-  const { data, error } = await supabase.auth.getUser()
+  const { data, error } = await supabase.auth.getUser(token)
   if (error) return ''
   return String(data?.user?.email || '').trim().toLowerCase()
 }
