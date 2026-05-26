@@ -2,13 +2,13 @@ import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-d
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ToastProvider } from './context/ToastContext'
 import Navbar from './components/Navbar'
-import MobileTabBar from './components/MobileTabBar'
 import SiteFooter from './components/SiteFooter'
 import ToastHost from './components/ToastHost'
 import Home from './pages/Home'
 import SendPackage from './pages/SendPackage'
 import Track from './pages/Track'
 import Admin from './pages/Admin'
+import AdminActivity from './pages/AdminActivity'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Notifications from './pages/Notifications'
@@ -45,6 +45,19 @@ function ProtectedUserRoute({ children }) {
   return children
 }
 
+function BlockAdminRoute({ children }) {
+  const { loading, isAdmin } = useAuth()
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-primary"></div>
+      </div>
+    )
+  }
+  if (isAdmin) return <Navigate to="/admin" replace />
+  return children
+}
+
 function App() {
   return (
     <AuthProvider>
@@ -61,31 +74,47 @@ export default App
 
 function AppLayout() {
   const location = useLocation()
-  const isAuthPage = location.pathname === '/login'
+  const isAuthPage = location.pathname === '/login' || location.pathname === '/signup'
+  const isAdminArea = location.pathname.startsWith('/admin')
 
   return (
     <div className="min-h-screen bg-background text-text flex flex-col">
       <ToastHost />
-      <Navbar />
-      <div className={`flex-grow flex flex-col ${isAuthPage ? 'pb-0 overflow-hidden' : 'pb-24 md:pb-0'}`}>
+      {!isAdminArea && <Navbar />}
+      <div className={`flex-grow flex flex-col ${isAuthPage || isAdminArea ? 'pb-0 overflow-hidden' : 'pb-0'}`}>
         <div className="flex-grow">
           <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/send" element={<SendPackage />} />
+            <Route
+              path="/"
+              element={
+                <BlockAdminRoute>
+                  <Home />
+                </BlockAdminRoute>
+              }
+            />
+            <Route
+              path="/send"
+              element={
+                <BlockAdminRoute>
+                  <SendPackage />
+                </BlockAdminRoute>
+              }
+            />
             <Route
               path="/track"
               element={
-                <ProtectedUserRoute>
-                  <Track />
-                </ProtectedUserRoute>
+                <Track />
               }
             />
             <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Login initialMode="signup" />} />
             <Route
               path="/dashboard"
               element={
                 <ProtectedUserRoute>
-                  <Dashboard />
+                  <BlockAdminRoute>
+                    <Dashboard />
+                  </BlockAdminRoute>
                 </ProtectedUserRoute>
               }
             />
@@ -93,7 +122,9 @@ function AppLayout() {
               path="/notifications"
               element={
                 <ProtectedUserRoute>
-                  <Notifications />
+                  <BlockAdminRoute>
+                    <Notifications />
+                  </BlockAdminRoute>
                 </ProtectedUserRoute>
               }
             />
@@ -105,12 +136,19 @@ function AppLayout() {
                 </ProtectedAdminRoute>
               }
             />
+            <Route
+              path="/admin/activity"
+              element={
+                <ProtectedAdminRoute>
+                  <AdminActivity />
+                </ProtectedAdminRoute>
+              }
+            />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
-        {!isAuthPage && <SiteFooter />}
+        {!isAuthPage && !isAdminArea && <SiteFooter />}
       </div>
-      <MobileTabBar />
     </div>
   )
 }

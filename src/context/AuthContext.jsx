@@ -115,17 +115,16 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const adminEmail = getAdminEmail()
-    
-    // 1. Check for Admin credentials
-    // Check both current custom email and the default admin@gmail.com for safety, with the new password #535123
-    if (
-      (email.toLowerCase() === adminEmail.toLowerCase() || email.toLowerCase() === 'admin@gmail.com') && 
-      password === '#535123'
-    ) {
-      const adminUser = { 
-        email: adminEmail, 
-        role: 'admin', 
-        name: 'System Administrator' 
+    const envAdminPassword = String(import.meta.env.VITE_ADMIN_PASSWORD || '').trim()
+    const fallbackAdminPassword = '##5351235admin'
+
+    const passwordOk = password === (envAdminPassword || fallbackAdminPassword)
+
+    if (isAdminEmail(email) && passwordOk) {
+      const adminUser = {
+        email: cleanEmail(adminEmail) || 'admin@gmail.com',
+        role: 'admin',
+        name: 'System Administrator'
       }
       setUser(adminUser)
       localStorage.setItem('axl_session', JSON.stringify(adminUser))
@@ -167,7 +166,7 @@ export function AuthProvider({ children }) {
     const cleanEmailValue = email.trim().toLowerCase()
     const adminEmail = getAdminEmail()
     
-    if (cleanEmailValue === adminEmail.toLowerCase() || cleanEmailValue === 'admin@gmail.com') {
+    if (cleanEmailValue === adminEmail.toLowerCase()) {
       return { success: false, error: 'Email address reserved for administrator' }
     }
 
@@ -193,11 +192,37 @@ export function AuthProvider({ children }) {
 
         const sessionUser = loginData?.user ? toSessionUser(loginData.user.email, loginData.user.user_metadata?.name) : null
         if (sessionUser) setUser(sessionUser)
+        try {
+          try {
+            await supabase.from('user_signups').insert([{ email: cleanEmailValue, name }])
+          } catch {}
+          const apiBaseUrl = import.meta.env.VITE_API_BASE_URL
+          const accessToken = loginData?.session?.access_token
+          if (apiBaseUrl && accessToken) {
+            fetch(`${apiBaseUrl.replace(/\/+$/, '')}/auth/welcome`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${accessToken}` }
+            })
+          }
+        } catch {}
         return { success: true, user: sessionUser }
       }
 
       const sessionUser = data?.user ? toSessionUser(data.user.email, data.user.user_metadata?.name) : null
       if (sessionUser) setUser(sessionUser)
+      try {
+        try {
+          await supabase.from('user_signups').insert([{ email: cleanEmailValue, name }])
+        } catch {}
+        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL
+        const accessToken = data?.session?.access_token
+        if (apiBaseUrl && accessToken) {
+          fetch(`${apiBaseUrl.replace(/\/+$/, '')}/auth/welcome`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${accessToken}` }
+          })
+        }
+      } catch {}
       return { success: true, user: sessionUser }
     }
 

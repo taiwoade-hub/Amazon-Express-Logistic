@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { Copy, Check, Upload, Trash2, Phone, MapPin, Package, AlertCircle } from 'lucide-react'
 import { COUNTRIES } from '../lib/countries'
 import { DELIVERY_LANGUAGES } from '../lib/deliveryLanguages'
+import { CURRENCIES } from '../lib/currencies'
 import { serializeDeliveryImages } from '../lib/deliveryImages'
 
 function generateTrackingId() {
@@ -28,14 +29,18 @@ function ShipmentForm({ title, description }) {
   const [formData, setFormData] = useState({
     sender_name: user?.name || '',
     sender_email: user?.email || '',
+    sender_phone: '',
     receiver_name: '',
+    receiver_phone: '',
     pickup_location: '',
     pickup_country: '',
     destination: '',
     destination_country: '',
-    phone: '',
     package_type: 'standard',
     delivery_language: 'en',
+    item_description: '',
+    currency: 'GBP',
+    price: '',
     delivery_notes: ''
   })
 
@@ -330,25 +335,61 @@ function ShipmentForm({ title, description }) {
         tracking_id: newTrackingId,
         status: 'processing',
         package_image: serializeDeliveryImages(imagePreviews),
-        sender_email: user?.email || formData.sender_email || null
+        sender_email: user?.email || formData.sender_email || null,
+        phone: formData.receiver_phone,
+        price: formData.price === '' ? null : Number(formData.price),
+        currency: String(formData.currency || '').trim().toUpperCase() || null
       }
 
       const { error: insertError } = await supabase.from('deliveries').insert([payload])
       if (insertError) {
-        const message = String(insertError.message || '')
-        const lower = message.toLowerCase()
-        if (lower.includes('schema') || lower.includes('column')) {
-          const fallbackPayload = { ...payload }
-          delete fallbackPayload.package_image
-          delete fallbackPayload.pickup_country
-          delete fallbackPayload.destination_country
-          delete fallbackPayload.delivery_language
-          delete fallbackPayload.delivery_notes
-          const { error: fallbackError } = await supabase.from('deliveries').insert([fallbackPayload])
-          if (fallbackError) throw fallbackError
-        } else {
-          throw insertError
+        let currentError = insertError
+        let attemptPayload = { ...payload }
+
+        for (let attempt = 0; attempt < 10; attempt += 1) {
+          const message = String(currentError?.message || '')
+          const lower = message.toLowerCase()
+          if (!lower.includes('schema') && !lower.includes('column')) break
+
+          const match =
+            message.match(/column "([^"]+)"/i) ||
+            message.match(/the "([^"]+)" column/i) ||
+            message.match(/'([^']+)' column/i)
+          const column = String(match?.[1] || '').trim()
+          if (!column) break
+
+          if (Object.prototype.hasOwnProperty.call(attemptPayload, column)) {
+            delete attemptPayload[column]
+          } else {
+            break
+          }
+
+          const { error: retryError } = await supabase.from('deliveries').insert([attemptPayload])
+          if (!retryError) {
+            currentError = null
+            break
+          }
+
+          currentError = retryError
         }
+
+        if (currentError) throw currentError
+      }
+
+      try {
+        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL
+        if (!supabase.isMock && apiBaseUrl && supabase.auth) {
+          const { data } = await supabase.auth.getSession()
+          const token = data?.session?.access_token
+          if (token) {
+            fetch(`${apiBaseUrl.replace(/\/+$/, '')}/deliveries/send-created-email`, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ trackingId: newTrackingId })
+            })
+          }
+        }
+      } catch {
       }
 
       setTrackingId(newTrackingId)
@@ -356,14 +397,18 @@ function ShipmentForm({ title, description }) {
       setFormData({
         sender_name: user?.name || '',
         sender_email: user?.email || '',
+        sender_phone: '',
         receiver_name: '',
+        receiver_phone: '',
         pickup_location: '',
         pickup_country: '',
         destination: '',
         destination_country: '',
-        phone: '',
         package_type: 'standard',
         delivery_language: 'en',
+        item_description: '',
+        currency: 'GBP',
+        price: '',
         delivery_notes: ''
       })
       setImagePreviews([])
@@ -404,13 +449,13 @@ function ShipmentForm({ title, description }) {
         <div className="flex flex-col gap-2">
           <button
             onClick={() => setSuccess(false)}
-            className="w-full bg-primary hover:bg-black text-white py-3.5 rounded-xl font-black transition-colors text-sm"
+            className="w-full bg-primary hover:bg-primary/90 text-white py-3.5 rounded-xl font-black transition-colors text-sm"
           >
             Send Another Package
           </button>
           <Link
             to={user ? '/dashboard' : '/'}
-            className="w-full bg-white hover:bg-black/5 text-primary py-3.5 rounded-xl font-black transition-colors text-sm border border-border"
+            className="w-full bg-white hover:bg-primary/5 text-primary py-3.5 rounded-xl font-black transition-colors text-sm border border-border"
           >
             Back to {user ? 'Portal' : 'Home'}
           </Link>
@@ -458,10 +503,29 @@ function ShipmentForm({ title, description }) {
                 name="sender_email"
                 value={formData.sender_email}
                 onChange={handleChange}
+                required={!user}
                 disabled={!!user}
                 placeholder="email@example.com"
                 className="w-full px-4 py-3 rounded-xl border border-border focus:outline-none focus:border-border-active text-sm font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-black uppercase tracking-wider text-primary">Sender Phone</label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-text-muted">
+                  <Phone size={16} />
+                </span>
+                <input
+                  type="tel"
+                  name="sender_phone"
+                  value={formData.sender_phone}
+                  onChange={handleChange}
+                  required
+                  placeholder="Sender phone number"
+                  className="w-full pl-11 pr-4 py-3 rounded-xl border border-border focus:outline-none focus:border-border-active text-sm font-semibold"
+                />
+              </div>
             </div>
 
             <div className="space-y-1.5">
@@ -485,11 +549,11 @@ function ShipmentForm({ title, description }) {
                 </span>
                 <input
                   type="tel"
-                  name="phone"
-                  value={formData.phone}
+                  name="receiver_phone"
+                  value={formData.receiver_phone}
                   onChange={handleChange}
                   required
-                  placeholder="Phone number"
+                  placeholder="Receiver phone number"
                   className="w-full pl-11 pr-4 py-3 rounded-xl border border-border focus:outline-none focus:border-border-active text-sm font-semibold"
                 />
               </div>
@@ -539,7 +603,7 @@ function ShipmentForm({ title, description }) {
                   <button
                     type="button"
                     onClick={() => saveAddress('Pickup', formData.pickup_location, formData.pickup_country)}
-                    className="px-4 py-3 rounded-xl bg-primary text-white font-black text-sm hover:bg-black transition-colors"
+                    className="px-4 py-3 rounded-xl bg-primary text-white font-black text-sm hover:bg-primary/90 transition-colors"
                   >
                     Save
                   </button>
@@ -550,7 +614,7 @@ function ShipmentForm({ title, description }) {
                       deleteAddress(pickupSavedId)
                       setPickupSavedId('')
                     }}
-                    className="px-4 py-3 rounded-xl bg-white border border-border text-primary font-black text-sm hover:bg-black/5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="px-4 py-3 rounded-xl bg-white border border-border text-primary font-black text-sm hover:bg-primary/5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                     title="Remove pinned address"
                   >
                     <Trash2 size={16} />
@@ -605,7 +669,7 @@ function ShipmentForm({ title, description }) {
                   <button
                     type="button"
                     onClick={() => saveAddress('Destination', formData.destination, formData.destination_country)}
-                    className="px-4 py-3 rounded-xl bg-primary text-white font-black text-sm hover:bg-black transition-colors"
+                    className="px-4 py-3 rounded-xl bg-primary text-white font-black text-sm hover:bg-primary/90 transition-colors"
                   >
                     Save
                   </button>
@@ -616,7 +680,7 @@ function ShipmentForm({ title, description }) {
                       deleteAddress(destinationSavedId)
                       setDestinationSavedId('')
                     }}
-                    className="px-4 py-3 rounded-xl bg-white border border-border text-primary font-black text-sm hover:bg-black/5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="px-4 py-3 rounded-xl bg-white border border-border text-primary font-black text-sm hover:bg-primary/5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                     title="Remove pinned address"
                   >
                     <Trash2 size={16} />
@@ -682,6 +746,46 @@ function ShipmentForm({ title, description }) {
             </div>
 
             <div className="space-y-1.5">
+              <label className="block text-[11px] font-black uppercase tracking-wider text-primary">Currency</label>
+              <input
+                type="text"
+                name="currency"
+                value={formData.currency}
+                onChange={(e) => {
+                  const next = String(e.target.value || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3)
+                  setFormData((prev) => ({ ...prev, currency: next }))
+                }}
+                required
+                pattern="[A-Z]{3}"
+                placeholder="GBP"
+                list="currency-options"
+                className="w-full px-4 py-3 rounded-xl border border-border focus:outline-none focus:border-border-active text-sm font-semibold bg-white"
+              />
+              <datalist id="currency-options">
+                {CURRENCIES.map((currency) => (
+                  <option key={currency.code} value={currency.code}>
+                    {currency.name}
+                  </option>
+                ))}
+              </datalist>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-black uppercase tracking-wider text-primary">Delivery Price</label>
+              <input
+                type="number"
+                name="price"
+                value={formData.price}
+                onChange={handleChange}
+                min="0"
+                step="0.01"
+                required
+                placeholder="0.00"
+                className="w-full px-4 py-3 rounded-xl border border-border focus:outline-none focus:border-border-active text-sm font-semibold"
+              />
+            </div>
+
+            <div className="space-y-1.5">
               <label className="block text-[11px] font-black uppercase tracking-wider text-primary">Delivery Notes Language</label>
               <select
                 name="delivery_language"
@@ -695,6 +799,19 @@ function ShipmentForm({ title, description }) {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className="space-y-1.5 sm:col-span-2">
+              <label className="block text-[11px] font-black uppercase tracking-wider text-primary">What Was Delivered</label>
+              <textarea
+                name="item_description"
+                value={formData.item_description}
+                onChange={handleChange}
+                rows={3}
+                required
+                placeholder="Describe the item(s) in the package"
+                className="w-full px-4 py-3 rounded-xl border border-border focus:outline-none focus:border-border-active text-sm font-semibold resize-none"
+              />
             </div>
 
             <div className="space-y-1.5 sm:col-span-2">
@@ -721,7 +838,7 @@ function ShipmentForm({ title, description }) {
                 onDragLeave={handleDrag}
                 onDrop={handleDrop}
                 className={`border border-dashed rounded-2xl px-4 py-4 transition-colors ${
-                  dragActive ? 'border-border-active bg-black/5' : 'border-border bg-white hover:bg-black/5'
+                  dragActive ? 'border-border-active bg-primary/5' : 'border-border bg-white hover:bg-primary/5'
                 }`}
               >
                 <label className={`block ${imagePreviews.length >= 4 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
@@ -755,7 +872,7 @@ function ShipmentForm({ title, description }) {
                       <button
                         type="button"
                         onClick={() => removeImage(index)}
-                        className="absolute top-2 right-2 p-2 bg-primary text-white rounded-xl transition-colors hover:bg-black"
+                        className="absolute top-2 right-2 p-2 bg-primary text-white rounded-xl transition-colors hover:bg-primary/90"
                         title="Remove Image"
                       >
                         <Trash2 size={14} />
@@ -771,7 +888,7 @@ function ShipmentForm({ title, description }) {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-primary hover:bg-black text-white py-4 rounded-2xl font-black transition-colors disabled:opacity-50 flex justify-center items-center gap-2"
+          className="w-full bg-primary hover:bg-primary/90 text-white py-4 rounded-2xl font-black transition-colors disabled:opacity-50 flex justify-center items-center gap-2"
         >
           {loading ? (
             <>

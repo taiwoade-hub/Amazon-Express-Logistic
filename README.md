@@ -1,4 +1,4 @@
-# Amozon Express Logistics 🚚
+# Amazon Express Logisics
 
 A modern courier delivery and tracking system built with **React.js** and **Supabase**.  
 It allows users to send packages, generate tracking IDs, and track deliveries in real-time.
@@ -97,16 +97,24 @@ CREATE TABLE address_book (
 
 ---
 
-## 🔑 Environment Variables
+## Environment Variables
 
-Create a `.env` file in the root directory:
+Create a `.env` file in the root directory (copy `.env.example`):
 
 ```
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_API_BASE_URL=http://localhost:8787
+VITE_ADMIN_EMAIL=admin@gmail.com
+VITE_ADMIN_PASSWORD=##5351235admin
 ```
 
-Get these values from your Supabase project settings.
+For Supabase: get the URL + anon key from your Supabase project settings.
+
+Admin access:
+- The admin user is determined by the `admin_email` value in the `app_settings` table (or `VITE_ADMIN_EMAIL` as a fallback for UI gating).
+- There is no hardcoded admin password in the codebase.
+- For local mock-only usage (no Supabase), `VITE_ADMIN_PASSWORD` can be used to allow an admin login on the client.
 
 ---
 

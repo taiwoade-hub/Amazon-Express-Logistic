@@ -1,12 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Truck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { COMPANY_PROFILE } from '../lib/companyProfile'
 
-function Login() {
-  const [isLogin, setIsLogin] = useState(true)
+function Login({ initialMode }) {
+  const [searchParams] = useSearchParams()
+  const queryMode = searchParams.get('mode')
+  const shouldStartSignup = initialMode === 'signup' || queryMode === 'signup'
+  const [isLogin, setIsLogin] = useState(!shouldStartSignup)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
@@ -15,9 +19,15 @@ function Login() {
   
   const { login, signup, user } = useAuth()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  
-  const redirect = searchParams.get('redirect') || 'dashboard'
+
+  const redirect = useMemo(() => {
+    const raw = searchParams.get('redirect') || 'dashboard'
+    try {
+      return decodeURIComponent(raw)
+    } catch {
+      return raw
+    }
+  }, [searchParams])
   const isUnauthorized = searchParams.get('error') === 'unauthorized'
   const normalizeRedirect = (value) => {
     const cleaned = String(value || '').trim()
@@ -38,6 +48,10 @@ function Login() {
       setError('Access denied. Please log in with administrator credentials.')
     }
   }, [isUnauthorized])
+
+  useEffect(() => {
+    if (queryMode === 'signup') setIsLogin(false)
+  }, [queryMode])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -80,7 +94,7 @@ function Login() {
           <div className="flex flex-col items-center gap-y-4 text-center">
             <Link to="/" className="flex flex-col items-center gap-3 mb-2 hover:opacity-90 transition-opacity">
               <img src="/logo.svg" alt="Amazon Logistics Logo" className="w-14 h-14" />
-              <span className="font-black text-primary tracking-tight text-lg">amazonlogisics.com</span>
+              <span className="font-black text-primary tracking-tight text-lg">{COMPANY_PROFILE.name}</span>
             </Link>
             <h1 className="text-3xl font-black tracking-tight text-primary">
               {isLogin ? 'Welcome Back' : 'Create an account'}
@@ -92,7 +106,7 @@ function Login() {
 
           <div className="flex w-full flex-col gap-5">
             {error && (
-              <div className="w-full rounded-2xl bg-red-50 text-red-600 px-4 py-3 text-sm font-semibold border border-red-100 text-center">
+              <div className="w-full rounded-2xl bg-accent/10 text-accent px-4 py-3 text-sm font-semibold border border-accent/20 text-center">
                 {error}
               </div>
             )}
@@ -143,13 +157,20 @@ function Login() {
                 {isLogin ? 'Sign up' : 'Log in'}
               </button>
             </div>
+            {isLogin && (
+              <div className="text-center">
+                <Link to={`/signup?redirect=${encodeURIComponent(redirect)}`} className="text-xs font-black text-primary hover:text-navy transition-colors">
+                  Create account
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       <div className="absolute inset-x-0 bottom-4 px-6">
         <div className="max-w-md mx-auto text-center text-[11px] text-text-muted font-semibold leading-relaxed">
-          <a href="tel:+447385284814" className="font-black text-primary hover:text-black transition-colors">
+          <a href="tel:+447385284814" className="font-black text-primary hover:text-navy transition-colors">
             +44 7385284814
           </a>
           <span className="mx-2">•</span>

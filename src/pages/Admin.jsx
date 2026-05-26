@@ -1,8 +1,17 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
-import { Edit2, Save, X, Search, Package, ShieldAlert, Image as ImageIcon, Eye, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Download, Edit2, Save, X, Search, Package, ShieldAlert, Eye, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { getDeliveryImages } from '../lib/deliveryImages'
+import { format, formatDistanceToNow } from 'date-fns'
+import AdminShell from '../components/AdminShell'
+
+function formatRelativeDateTime(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return `${format(date, 'HH:mm')} • ${formatDistanceToNow(date, { addSuffix: true })}`
+}
 
 function Admin() {
   const { user, isAdmin, changeAdminEmail, getAdminEmail } = useAuth()
@@ -17,6 +26,8 @@ function Admin() {
   
   const [zoomImages, setZoomImages] = useState([])
   const [zoomIndex, setZoomIndex] = useState(0)
+  const [pendingEmail, setPendingEmail] = useState(null)
+  const [sendingEmail, setSendingEmail] = useState(false)
 
   // Profile Edit States
   const [newAdminEmail, setNewAdminEmail] = useState('')
@@ -102,10 +113,124 @@ function Admin() {
       setSuccess('Status updated successfully')
       setEditingId(null)
       fetchDeliveries()
+      if (editingStatus === 'picked_up' || editingStatus === 'delivered' || editingStatus === 'cancelled') {
+        setPendingEmail({ deliveryId, status: editingStatus })
+      } else {
+        setPendingEmail(null)
+      }
       setTimeout(() => setSuccess(''), 3000)
     } catch (err) {
       console.error('Error updating status:', err)
       setError('Failed to update shipment status.')
+    }
+  }
+
+  const sendPendingStatusEmail = async () => {
+    if (!pendingEmail?.deliveryId || !pendingEmail?.status) return
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL
+    if (!apiBaseUrl) {
+      setError('VITE_API_BASE_URL is not configured.')
+      return
+    }
+
+    const status = pendingEmail.status
+    const type = status === 'picked_up' ? 'approved' : status
+
+    try {
+      setSendingEmail(true)
+      setError('')
+      setSuccess('')
+
+      const headers = { 'content-type': 'application/json' }
+      if (!supabase.isMock && supabase.auth) {
+        const { data } = await supabase.auth.getSession()
+        const token = data?.session?.access_token
+        if (token) {
+          headers.Authorization = `Bearer ${token}`
+        }
+      }
+
+      if (!headers.Authorization) {
+        headers['x-admin-email'] = user?.email || ''
+        headers['x-admin-password'] = '##5351235admin'
+      }
+
+      const resp = await fetch(`${apiBaseUrl.replace(/\/+$/, '')}/admin/send-status-email`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ deliveryId: pendingEmail.deliveryId, type })
+      })
+
+      let payload = null
+      try {
+        payload = await resp.json()
+      } catch {
+      }
+
+      if (!resp.ok) {
+        setError(payload?.error || 'Failed to send email.')
+        return
+      }
+
+      setSuccess('Email sent successfully')
+      setPendingEmail(null)
+      setTimeout(() => setSuccess(''), 3000)
+    } catch {
+      setError('Failed to send email.')
+    } finally {
+      setSendingEmail(false)
+    }
+  }
+
+  const downloadReceiptPdf = async (trackingId) => {
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL
+    if (!apiBaseUrl) {
+      setError('VITE_API_BASE_URL is not configured.')
+      return
+    }
+
+    const cleanTrackingId = String(trackingId || '').trim()
+    if (!cleanTrackingId) return
+
+    try {
+      setError('')
+      setSuccess('')
+
+      const headers = {}
+      if (!supabase.isMock && supabase.auth) {
+        const { data } = await supabase.auth.getSession()
+        const token = data?.session?.access_token
+        if (token) headers.Authorization = `Bearer ${token}`
+      }
+
+      if (!headers.Authorization) {
+        headers['x-admin-email'] = user?.email || ''
+        headers['x-admin-password'] = '##5351235admin'
+      }
+
+      const url = `${apiBaseUrl.replace(/\/+$/, '')}/admin/receipts/${encodeURIComponent(cleanTrackingId)}.pdf`
+      const resp = await fetch(url, { headers })
+      if (!resp.ok) {
+        let payload = null
+        try {
+          payload = await resp.json()
+        } catch {
+        }
+        setError(payload?.error || 'Failed to download PDF.')
+        return
+      }
+
+      const blob = await resp.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = objectUrl
+      a.download = `receipt-${cleanTrackingId}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(objectUrl)
+    } catch {
+      setError('Failed to download PDF.')
     }
   }
 
@@ -146,18 +271,18 @@ function Admin() {
   }
 
   const statusColors = {
-    processing: 'text-white bg-black border-black font-black uppercase tracking-wider px-2 py-0.5 rounded text-[10px]',
-    picked_up: 'text-black bg-white border-black border-2 font-black uppercase tracking-wider px-2 py-0.5 rounded text-[10px]',
-    in_transit: 'text-black bg-white border-black border-2 font-black uppercase tracking-wider px-2 py-0.5 rounded text-[10px]',
-    delivered: 'text-black bg-white border-black border-4 font-black uppercase tracking-wider px-2 py-0.5 rounded text-[10px]',
-    cancelled: 'text-white bg-black border-black line-through font-black uppercase tracking-wider px-2 py-0.5 rounded text-[10px]'
+    processing: 'text-white bg-status-pending border-status-pending font-black uppercase tracking-wider px-2 py-0.5 rounded text-[10px]',
+    picked_up: 'text-white bg-status-transit border-status-transit font-black uppercase tracking-wider px-2 py-0.5 rounded text-[10px]',
+    in_transit: 'text-white bg-status-transit border-status-transit font-black uppercase tracking-wider px-2 py-0.5 rounded text-[10px]',
+    delivered: 'text-white bg-status-delivered border-status-delivered font-black uppercase tracking-wider px-2 py-0.5 rounded text-[10px]',
+    cancelled: 'text-white bg-accent border-accent line-through font-black uppercase tracking-wider px-2 py-0.5 rounded text-[10px]'
   }
 
   // Security check fallback
   if (!isAdmin) {
     return (
       <main className="min-h-screen py-20 px-6 flex items-center justify-center bg-white">
-        <div className="glass-panel rounded-3xl p-8 border-black bg-black text-center max-w-sm text-white shadow-2xl">
+        <div className="glass-panel rounded-3xl p-8 border-navy bg-navy text-center max-w-sm text-white shadow-2xl">
           <ShieldAlert className="w-16 h-16 text-white mx-auto mb-4" />
           <h2 className="text-2xl font-black text-white uppercase tracking-tight">Access Denied</h2>
           <p className="text-white/80 font-semibold text-sm mt-4">
@@ -187,128 +312,116 @@ function Admin() {
   const deliveredCount = deliveries.filter(d => d.status === 'delivered').length
 
   return (
-    <main className="min-h-screen py-10 px-6 max-w-7xl mx-auto space-y-8 bg-background">
-      
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl sm:text-4xl font-black text-primary tracking-tight flex flex-wrap items-center gap-3">
-            <span>Admin Control Center</span>
-            <span className="text-xs uppercase tracking-widest bg-primary text-white px-3 py-1 rounded-full font-black">Secured Mode</span>
-          </h1>
-          <p className="text-text-muted mt-1 font-semibold">Manage global shipment tracking registries, update live package statuses, and analyze courier performance.</p>
-        </div>
+    <AdminShell
+      title="Shipments"
+      subtitle="Manage shipment records, update live statuses, and trigger customer notifications."
+      actions={
         <button
+          type="button"
           onClick={() => {
             setShowSettings(!showSettings)
             setNewAdminEmail(getAdminEmail ? getAdminEmail() : user?.email || '')
           }}
-          className="bg-primary hover:bg-black text-white px-5 py-2.5 rounded-2xl text-sm font-black transition-colors shadow-sm"
+          className="bg-primary hover:bg-navy text-white px-4 py-2 rounded-2xl text-xs font-black transition-colors"
         >
-          {showSettings ? 'Close Settings' : 'Admin Profile Settings'}
+          {showSettings ? 'Close settings' : 'Settings'}
         </button>
-      </div>
+      }
+    >
+      <div className="space-y-6">
+        {showSettings && (
+          <div className="rounded-3xl border border-border bg-background p-5">
+            <h2 className="text-sm font-black text-primary">Administrator Email</h2>
+            <p className="text-xs text-text-muted font-semibold mt-1 max-w-2xl">
+              Update the system administrator email address used for administrator checks and sign-in.
+            </p>
 
-      {/* Profile Settings Panel */}
-      {showSettings && (
-        <div className="glass-panel rounded-3xl p-6 bg-white shadow-xl">
-          <h2 className="text-lg font-black text-primary mb-2">Change Administrator Email Address</h2>
-          <p className="text-xs text-text-muted font-semibold mb-4">Update the system administrator email address. This will change your login identity and session profile.</p>
-          
-          <form onSubmit={handleUpdateEmail} className="flex flex-col sm:flex-row gap-4 items-end max-w-lg">
-            <div className="w-full space-y-1">
-              <label className="block text-[10px] font-black text-primary uppercase tracking-wider">Admin Email</label>
-              <input
-                type="email"
-                value={newAdminEmail}
-                onChange={(e) => setNewAdminEmail(e.target.value)}
-                placeholder="new-admin@gmail.com"
-                className="w-full px-4 py-2 bg-white border border-border rounded-xl focus:outline-none focus:border-border-active transition-colors text-sm placeholder-black/30 text-primary font-semibold"
-                required
-              />
-            </div>
-            <button
-              type="submit"
-              className="bg-primary hover:bg-black text-white px-6 py-2.5 rounded-2xl text-sm font-black transition-colors flex-shrink-0"
-            >
-              Update Email
-            </button>
-          </form>
+            <form onSubmit={handleUpdateEmail} className="mt-4 flex flex-col sm:flex-row gap-3 items-end max-w-xl">
+              <div className="w-full space-y-1">
+                <label className="block text-[10px] font-black text-primary uppercase tracking-wider">Admin Email</label>
+                <input
+                  type="email"
+                  value={newAdminEmail}
+                  onChange={(e) => setNewAdminEmail(e.target.value)}
+                  placeholder="admin@example.com"
+                  className="w-full px-4 py-3 bg-white border border-border rounded-2xl focus:outline-none focus:border-border-active transition-colors text-sm placeholder-black/30 text-primary font-semibold"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                className="bg-primary hover:bg-navy text-white px-6 py-3 rounded-2xl text-sm font-black transition-colors flex-shrink-0"
+              >
+                Save
+              </button>
+            </form>
 
-          {emailEditError && <p className="text-xs text-primary mt-2 font-black">{emailEditError}</p>}
-          {emailEditSuccess && <p className="text-xs text-primary mt-2 font-black">{emailEditSuccess}</p>}
-        </div>
-      )}
+            {emailEditError && <p className="text-xs text-accent mt-3 font-black">{emailEditError}</p>}
+            {emailEditSuccess && <p className="text-xs text-primary mt-3 font-black">{emailEditSuccess}</p>}
+          </div>
+        )}
 
-      {/* Messages */}
-      {error && (
-        <div className="bg-primary text-white rounded-2xl p-4 text-sm font-black">
-          {error}
-        </div>
-      )}
-      {success && (
-        <div className="bg-primary text-white rounded-2xl p-4 text-sm font-black">
-          {success}
-        </div>
-      )}
+        {error && (
+          <div className="bg-accent text-white rounded-2xl p-4 text-sm font-black">
+            {error}
+          </div>
+        )}
+        {success && (
+          <div className="bg-status-delivered text-white rounded-2xl p-4 text-sm font-black">
+            {success}
+          </div>
+        )}
 
-      {/* Stats Board */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="glass-panel rounded-3xl p-5 bg-white">
-          <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Total Shipments</p>
-          <p className="text-3xl font-black text-primary mt-1">{loading ? '...' : totalCount}</p>
-        </div>
-        <div className="glass-panel rounded-3xl p-5 bg-white">
-          <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Pending Processing</p>
-          <p className="text-3xl font-black text-primary mt-1">{loading ? '...' : processingCount}</p>
-        </div>
-        <div className="glass-panel rounded-3xl p-5 bg-white">
-          <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Active Transit</p>
-          <p className="text-3xl font-black text-primary mt-1">{loading ? '...' : transitCount}</p>
-        </div>
-        <div className="glass-panel rounded-3xl p-5 bg-white">
-          <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Delivered Packages</p>
-          <p className="text-3xl font-black text-primary mt-1">{loading ? '...' : deliveredCount}</p>
-        </div>
-      </div>
-
-      {/* Filters & Search */}
-      <div className="glass-panel rounded-3xl p-4 flex flex-col md:flex-row gap-4 justify-between items-center bg-white">
-        
-        {/* Search */}
-        <div className="relative w-full md:max-w-md">
-          <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-text-muted">
-            <Search size={18} />
-          </span>
-          <input
-            type="text"
-            placeholder="Search tracking ID, sender, receiver name..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-11 pr-4 py-3 bg-white border border-border rounded-2xl focus:outline-none focus:border-border-active transition-colors text-sm placeholder-black/30 text-primary font-semibold"
-          />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="rounded-3xl border border-border bg-white p-5">
+            <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Total Shipments</p>
+            <p className="text-3xl font-black text-primary mt-1">{loading ? '...' : totalCount}</p>
+          </div>
+          <div className="rounded-3xl border border-border bg-white p-5">
+            <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Pending Processing</p>
+            <p className="text-3xl font-black text-primary mt-1">{loading ? '...' : processingCount}</p>
+          </div>
+          <div className="rounded-3xl border border-border bg-white p-5">
+            <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Active Transit</p>
+            <p className="text-3xl font-black text-primary mt-1">{loading ? '...' : transitCount}</p>
+          </div>
+          <div className="rounded-3xl border border-border bg-white p-5">
+            <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Delivered Packages</p>
+            <p className="text-3xl font-black text-primary mt-1">{loading ? '...' : deliveredCount}</p>
+          </div>
         </div>
 
-        {/* Filter Tabs */}
-        <div className="flex bg-black/5 rounded-2xl p-1 w-full md:w-auto overflow-x-auto gap-1 border border-border">
-          {['all', 'processing', 'picked_up', 'in_transit', 'delivered', 'cancelled'].map((status) => (
-            <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              className={`px-4 py-2 rounded-xl text-xs font-black whitespace-nowrap transition-colors ${
-                statusFilter === status 
-                  ? 'bg-white text-primary' 
-                  : 'text-text-muted hover:text-primary'
-              }`}
-            >
-              {status === 'all' ? 'All' : statusLabels[status]}
-            </button>
-          ))}
-        </div>
-      </div>
+        <div className="rounded-3xl border border-border bg-white p-4 flex flex-col md:flex-row gap-4 justify-between items-center">
+          <div className="relative w-full md:max-w-md">
+            <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-text-muted">
+              <Search size={18} />
+            </span>
+            <input
+              type="text"
+              placeholder="Search tracking ID, sender, receiver..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-11 pr-4 py-3 bg-white border border-border rounded-2xl focus:outline-none focus:border-border-active transition-colors text-sm placeholder-black/30 text-primary font-semibold"
+            />
+          </div>
 
-      {/* Main Table/Grid */}
-      <div className="glass-panel rounded-3xl overflow-hidden bg-white">
+          <div className="flex bg-background rounded-2xl p-1 w-full md:w-auto overflow-x-auto gap-1 border border-border">
+            {['all', 'processing', 'picked_up', 'in_transit', 'delivered', 'cancelled'].map((status) => (
+              <button
+                key={status}
+                type="button"
+                onClick={() => setStatusFilter(status)}
+                className={`px-4 py-2 rounded-xl text-xs font-black whitespace-nowrap transition-colors ${
+                  statusFilter === status ? 'bg-white text-primary' : 'text-text-muted hover:text-primary'
+                }`}
+              >
+                {status === 'all' ? 'All' : statusLabels[status]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-3xl overflow-hidden bg-white border border-border">
         {loading ? (
           <div className="py-20 flex flex-col items-center justify-center gap-3">
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-primary"></div>
@@ -326,7 +439,7 @@ function Admin() {
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-black bg-black text-xs font-black uppercase tracking-wider text-white">
+                  <tr className="border-b border-navy bg-navy text-xs font-black uppercase tracking-wider text-white">
                     <th className="py-4 px-6">Tracking Details</th>
                     <th className="py-4 px-6">Sender Details</th>
                     <th className="py-4 px-6">Receiver Details</th>
@@ -334,14 +447,15 @@ function Admin() {
                     <th className="py-4 px-6 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-black text-sm text-black bg-white">
+                <tbody className="divide-y divide-border text-sm text-text bg-white">
                   {filteredDeliveries.map((delivery) => {
                     const images = getDeliveryImages(delivery.package_image)
                     const mainImage = images[0]
                     const extraCount = Math.max(0, images.length - 1)
+                    const showInlineEmail = String(pendingEmail?.deliveryId || '') === String(delivery.id)
 
-                    return (
-                    <tr key={delivery.id} className="hover:bg-black/5 transition-all">
+                    return [
+                    <tr key={delivery.id} className="hover:bg-navy/5 transition-all">
                       {/* Tracking ID & Picture */}
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3">
@@ -357,25 +471,26 @@ function Admin() {
                               <img 
                                 src={mainImage} 
                                 alt="Package Thumbnail" 
-                                className="w-12 h-12 rounded-xl object-cover border border-black group-hover:opacity-90 transition-all bg-white"
+                                className="w-12 h-12 rounded-xl object-cover border border-border group-hover:opacity-90 transition-all bg-white"
                               />
                               {extraCount > 0 && (
-                                <div className="absolute -bottom-2 -right-2 bg-black text-white text-[10px] font-black px-2 py-0.5 rounded-full border border-black">
+                                <div className="absolute -bottom-2 -right-2 bg-navy text-white text-[10px] font-black px-2 py-0.5 rounded-full border border-navy">
                                   +{extraCount}
                                 </div>
                               )}
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-xl transition-all">
+                              <div className="absolute inset-0 bg-navy/40 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-xl transition-all">
                                 <Eye size={12} className="text-white" />
                               </div>
                             </div>
                           ) : (
-                            <div className="w-12 h-12 rounded-xl bg-black border border-black flex items-center justify-center text-white flex-shrink-0">
+                            <div className="w-12 h-12 rounded-xl bg-navy border border-navy flex items-center justify-center text-white flex-shrink-0">
                               <Package size={20} />
                             </div>
                           )}
                           <div>
-                            <div className="font-black text-black">{delivery.tracking_id}</div>
-                            <div className="text-[10px] text-black opacity-60 font-black uppercase mt-0.5">{delivery.package_type}</div>
+                            <div className="font-black text-text">{delivery.tracking_id}</div>
+                            <div className="text-[10px] text-text-muted font-black uppercase mt-0.5">{delivery.package_type}</div>
+                            <div className="text-[10px] text-text-muted font-black uppercase mt-0.5">{formatRelativeDateTime(delivery.created_at)}</div>
                           </div>
                         </div>
                       </td>
@@ -383,15 +498,15 @@ function Admin() {
                       {/* Sender */}
                       <td className="py-4 px-6">
                         <div className="font-black">{delivery.sender_name}</div>
-                        <div className="text-xs text-black opacity-70 font-semibold">{delivery.sender_email || 'Guest Sender'}</div>
-                        <div className="text-xs text-black opacity-70 font-semibold truncate max-w-[180px]">{delivery.pickup_location}</div>
+                        <div className="text-xs text-text-muted font-semibold">{delivery.sender_email || 'Guest Sender'}</div>
+                        <div className="text-xs text-text-muted font-semibold truncate max-w-[180px]">{delivery.pickup_location}</div>
                       </td>
 
                       {/* Receiver */}
                       <td className="py-4 px-6">
                         <div className="font-black">{delivery.receiver_name}</div>
-                        <div className="text-xs text-black opacity-70 font-semibold">{delivery.phone}</div>
-                        <div className="text-xs text-black opacity-70 font-semibold truncate max-w-[180px]">{delivery.destination}</div>
+                        <div className="text-xs text-text-muted font-semibold">{delivery.receiver_phone || delivery.phone}</div>
+                        <div className="text-xs text-text-muted font-semibold truncate max-w-[180px]">{delivery.destination}</div>
                       </td>
 
                       {/* Status select editor */}
@@ -400,7 +515,7 @@ function Admin() {
                           <select
                             value={editingStatus}
                             onChange={(e) => setEditingStatus(e.target.value)}
-                            className="bg-white border border-black text-black font-black rounded-lg px-3 py-1.5 focus:outline-none focus:border-black text-xs"
+                            className="bg-white border border-border text-text font-black rounded-lg px-3 py-1.5 focus:outline-none focus:border-border-active text-xs"
                           >
                             {statusOptions.map(status => (
                               <option key={status} value={status}>
@@ -422,14 +537,14 @@ function Admin() {
                             <>
                               <button
                                 onClick={() => handleSaveStatus(delivery.id)}
-                                className="bg-black hover:bg-white text-white hover:text-black p-2 rounded-lg border border-black transition-all"
+                                className="bg-navy hover:bg-white text-white hover:text-text p-2 rounded-lg border border-navy transition-all"
                                 title="Save"
                               >
                                 <Save size={14} />
                               </button>
                               <button
                                 onClick={handleCancel}
-                                className="bg-white hover:bg-black text-black hover:text-white p-2 rounded-lg border border-black transition-all"
+                                className="bg-white hover:bg-navy text-text hover:text-white p-2 rounded-lg border border-navy transition-all"
                                 title="Cancel"
                               >
                                 <X size={14} />
@@ -438,15 +553,23 @@ function Admin() {
                           ) : (
                             <>
                               <button
+                                type="button"
+                                onClick={() => downloadReceiptPdf(delivery.tracking_id)}
+                                className="bg-white hover:bg-navy text-text hover:text-white p-2 rounded-lg border border-navy transition-all"
+                                title="Download PDF"
+                              >
+                                <Download size={14} />
+                              </button>
+                              <button
                                 onClick={() => handleEditClick(delivery)}
-                                className="bg-black hover:bg-white text-white hover:text-black p-2 rounded-lg border border-black transition-all"
+                                className="bg-navy hover:bg-white text-white hover:text-text p-2 rounded-lg border border-navy transition-all"
                                 title="Edit Status"
                               >
                                 <Edit2 size={14} />
                               </button>
                               <button
                                 onClick={() => handleDelete(delivery.id)}
-                                className="bg-white hover:bg-black text-black hover:text-white p-2 rounded-lg border border-black transition-all"
+                                className="bg-white hover:bg-navy text-text hover:text-white p-2 rounded-lg border border-navy transition-all"
                                 title="Delete Record"
                               >
                                 <Trash2 size={14} />
@@ -456,18 +579,55 @@ function Admin() {
                         </div>
                       </td>
                     </tr>
-                    )
+                    ,
+                    showInlineEmail ? (
+                      <tr key={`${delivery.id}-email`} className="bg-navy/5">
+                        <td colSpan={5} className="px-6 pb-6">
+                          <div className="glass-panel rounded-3xl p-5 bg-white shadow-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4 border border-border">
+                            <div>
+                              <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Manual Email Action</p>
+                              <p className="text-base font-black text-primary mt-1">
+                                {pendingEmail.status === 'picked_up' ? 'Send approval email to customer' : pendingEmail.status === 'cancelled' ? 'Send cancellation email to customer' : 'Send delivered + receipt email to customer'}
+                              </p>
+                              <p className="text-xs text-text-muted font-semibold mt-1">
+                                This is manual to prevent accidental sending. You can click it once (idempotency is enabled).
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setPendingEmail(null)}
+                                disabled={sendingEmail}
+                                className="bg-white hover:bg-navy text-text hover:text-white px-5 py-3 rounded-2xl text-sm font-black transition-colors border border-border disabled:opacity-60"
+                              >
+                                Dismiss
+                              </button>
+                              <button
+                                type="button"
+                                onClick={sendPendingStatusEmail}
+                                disabled={sendingEmail}
+                                className="bg-primary hover:bg-navy text-white px-6 py-3 rounded-2xl text-sm font-black transition-colors disabled:opacity-60"
+                              >
+                                {sendingEmail ? 'Sending…' : 'Send email now'}
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null
+                    ].filter(Boolean)
                   })}
                 </tbody>
               </table>
             </div>
 
             {/* Mobile Cards View */}
-            <div className="md:hidden divide-y divide-black">
+            <div className="md:hidden divide-y divide-border">
               {filteredDeliveries.map((delivery) => {
                 const images = getDeliveryImages(delivery.package_image)
                 const mainImage = images[0]
                 const extraCount = Math.max(0, images.length - 1)
+                const showInlineEmail = String(pendingEmail?.deliveryId || '') === String(delivery.id)
 
                 return (
                 <div key={delivery.id} className="p-6 space-y-4 bg-white">
@@ -483,22 +643,23 @@ function Admin() {
                               setZoomImages(images)
                               setZoomIndex(0)
                             }}
-                            className="w-14 h-14 rounded-xl object-cover border border-black bg-white cursor-zoom-in"
+                            className="w-14 h-14 rounded-xl object-cover border border-border bg-white cursor-zoom-in"
                           />
                           {extraCount > 0 && (
-                            <div className="absolute -bottom-2 -right-2 bg-black text-white text-[10px] font-black px-2 py-0.5 rounded-full border border-black">
+                            <div className="absolute -bottom-2 -right-2 bg-navy text-white text-[10px] font-black px-2 py-0.5 rounded-full border border-navy">
                               +{extraCount}
                             </div>
                           )}
                         </div>
                       ) : (
-                        <div className="w-14 h-14 rounded-xl bg-black border border-black flex items-center justify-center text-white flex-shrink-0">
+                        <div className="w-14 h-14 rounded-xl bg-navy border border-navy flex items-center justify-center text-white flex-shrink-0">
                           <Package size={24} />
                         </div>
                       )}
                       <div>
-                        <div className="font-black text-black text-base">{delivery.tracking_id}</div>
-                        <div className="text-xs text-black opacity-60 font-black uppercase tracking-wider mt-0.5">{delivery.package_type} Courier</div>
+                        <div className="font-black text-text text-base">{delivery.tracking_id}</div>
+                        <div className="text-xs text-text-muted font-black uppercase tracking-wider mt-0.5">{delivery.package_type} Courier</div>
+                        <div className="text-[10px] text-text-muted font-black uppercase tracking-wider mt-0.5">{formatRelativeDateTime(delivery.created_at)}</div>
                       </div>
                     </div>
                     
@@ -508,13 +669,13 @@ function Admin() {
                         <>
                           <button
                             onClick={() => handleSaveStatus(delivery.id)}
-                            className="bg-black text-white p-2 rounded-lg border border-black"
+                            className="bg-navy text-white p-2 rounded-lg border border-navy"
                           >
                             <Save size={14} />
                           </button>
                           <button
                             onClick={handleCancel}
-                            className="bg-white text-black p-2 rounded-lg border border-black"
+                            className="bg-white text-text p-2 rounded-lg border border-navy"
                           >
                             <X size={14} />
                           </button>
@@ -522,14 +683,21 @@ function Admin() {
                       ) : (
                         <>
                           <button
+                            type="button"
+                            onClick={() => downloadReceiptPdf(delivery.tracking_id)}
+                            className="bg-white text-text p-2 rounded-lg border border-navy"
+                          >
+                            <Download size={14} />
+                          </button>
+                          <button
                             onClick={() => handleEditClick(delivery)}
-                            className="bg-black text-white p-2 rounded-lg border border-black"
+                            className="bg-navy text-white p-2 rounded-lg border border-navy"
                           >
                             <Edit2 size={14} />
                           </button>
                           <button
                             onClick={() => handleDelete(delivery.id)}
-                            className="bg-white text-black p-2 rounded-lg border border-black"
+                            className="bg-white text-text p-2 rounded-lg border border-navy"
                           >
                             <Trash2 size={14} />
                           </button>
@@ -539,7 +707,7 @@ function Admin() {
                   </div>
 
                   {/* Route & Contact info */}
-                  <div className="bg-black border border-black rounded-2xl p-4 space-y-3 text-xs text-white">
+                  <div className="bg-navy border border-navy rounded-2xl p-4 space-y-3 text-xs text-white">
                     <div className="grid grid-cols-2 gap-2 pb-2.5 border-b border-white/20">
                       <div>
                         <p className="text-white/60 font-black uppercase tracking-wider mb-0.5">Sender</p>
@@ -549,7 +717,7 @@ function Admin() {
                       <div>
                         <p className="text-white/60 font-black uppercase tracking-wider mb-0.5">Receiver</p>
                         <p className="font-black text-white">{delivery.receiver_name}</p>
-                        <p className="text-[10px] text-white/60">{delivery.phone}</p>
+                        <p className="text-[10px] text-white/60">{delivery.receiver_phone || delivery.phone}</p>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -568,11 +736,11 @@ function Admin() {
                   <div>
                     {editingId === delivery.id ? (
                       <div className="space-y-1">
-                        <label className="block text-[10px] font-black uppercase tracking-wider text-black">Modify Status</label>
+                        <label className="block text-[10px] font-black uppercase tracking-wider text-text">Modify Status</label>
                         <select
                           value={editingStatus}
                           onChange={(e) => setEditingStatus(e.target.value)}
-                          className="w-full bg-white border border-black text-black font-black rounded-xl px-3 py-2.5 text-xs"
+                          className="w-full bg-white border border-border text-text font-black rounded-xl px-3 py-2.5 text-xs"
                         >
                           {statusOptions.map(status => (
                             <option key={status} value={status}>
@@ -583,13 +751,43 @@ function Admin() {
                       </div>
                     ) : (
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-black font-black">Delivery Progress:</span>
+                        <span className="text-xs text-text font-black">Delivery Progress:</span>
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${statusColors[delivery.status]}`}>
                           {statusLabels[delivery.status]}
                         </span>
                       </div>
                     )}
                   </div>
+
+                  {showInlineEmail && (
+                    <div className="glass-panel rounded-3xl p-5 bg-white shadow-xl border border-border">
+                      <p className="text-[10px] font-black text-text-muted uppercase tracking-wider">Manual Email Action</p>
+                      <p className="text-base font-black text-primary mt-1">
+                        {pendingEmail.status === 'picked_up' ? 'Send approval email to customer' : pendingEmail.status === 'cancelled' ? 'Send cancellation email to customer' : 'Send delivered + receipt email to customer'}
+                      </p>
+                      <p className="text-xs text-text-muted font-semibold mt-1">
+                        This is manual to prevent accidental sending. You can click it once (idempotency is enabled).
+                      </p>
+                      <div className="mt-4 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setPendingEmail(null)}
+                          disabled={sendingEmail}
+                          className="flex-1 bg-white hover:bg-navy text-text hover:text-white px-4 py-3 rounded-2xl text-sm font-black transition-colors border border-border disabled:opacity-60"
+                        >
+                          Dismiss
+                        </button>
+                        <button
+                          type="button"
+                          onClick={sendPendingStatusEmail}
+                          disabled={sendingEmail}
+                          className="flex-1 bg-primary hover:bg-navy text-white px-4 py-3 rounded-2xl text-sm font-black transition-colors disabled:opacity-60"
+                        >
+                          {sendingEmail ? 'Sending…' : 'Send email'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 )
               })}
@@ -601,13 +799,13 @@ function Admin() {
       {/* Full zoom Image Modal */}
       {zoomImages.length > 0 && (
         <div
-          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-6"
+          className="fixed inset-0 z-50 bg-navy/90 backdrop-blur-sm flex items-center justify-center p-6"
           onClick={() => setZoomImages([])}
         >
           <div className="relative max-w-4xl w-full max-h-full" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => setZoomImages([])}
-              className="absolute top-4 right-4 bg-black hover:bg-white text-white hover:text-black p-2 rounded-full border border-black transition-all"
+              className="absolute top-4 right-4 bg-navy hover:bg-white text-white hover:text-text p-2 rounded-full border border-navy transition-all"
             >
               <X size={20} />
             </button>
@@ -616,13 +814,13 @@ function Admin() {
               <>
                 <button
                   onClick={() => setZoomIndex((prev) => (prev - 1 + zoomImages.length) % zoomImages.length)}
-                  className="absolute top-1/2 -translate-y-1/2 left-4 bg-black/70 hover:bg-white text-white hover:text-black p-2 rounded-full border border-black transition-all"
+                  className="absolute top-1/2 -translate-y-1/2 left-4 bg-navy/70 hover:bg-white text-white hover:text-text p-2 rounded-full border border-navy transition-all"
                 >
                   <ChevronLeft size={20} />
                 </button>
                 <button
                   onClick={() => setZoomIndex((prev) => (prev + 1) % zoomImages.length)}
-                  className="absolute top-1/2 -translate-y-1/2 right-4 bg-black/70 hover:bg-white text-white hover:text-black p-2 rounded-full border border-black transition-all"
+                  className="absolute top-1/2 -translate-y-1/2 right-4 bg-navy/70 hover:bg-white text-white hover:text-text p-2 rounded-full border border-navy transition-all"
                 >
                   <ChevronRight size={20} />
                 </button>
@@ -632,7 +830,7 @@ function Admin() {
             <img
               src={zoomImages[zoomIndex]}
               alt="Package zoomed preview"
-              className="rounded-2xl max-w-full max-h-[85vh] object-contain border border-black mx-auto"
+              className="rounded-2xl max-w-full max-h-[85vh] object-contain border border-navy mx-auto"
             />
 
             {zoomImages.length > 1 && (
@@ -655,7 +853,8 @@ function Admin() {
         </div>
       )}
 
-    </main>
+      </div>
+    </AdminShell>
   )
 }
 

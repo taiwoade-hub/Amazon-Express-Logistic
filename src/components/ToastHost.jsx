@@ -9,8 +9,8 @@ function iconFor(variant) {
 }
 
 function classesFor(variant) {
-  if (variant === 'success') return 'bg-white text-primary border-border'
-  if (variant === 'danger') return 'bg-black text-white border-black'
+  if (variant === 'success') return 'bg-status-delivered text-white border-status-delivered'
+  if (variant === 'danger') return 'bg-accent text-white border-accent'
   return 'bg-primary text-white border-primary'
 }
 
@@ -73,4 +73,3 @@ function ToastHost() {
 }
 
 export default ToastHost
-

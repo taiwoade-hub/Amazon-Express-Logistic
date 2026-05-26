@@ -26,6 +26,15 @@ CREATE TABLE IF NOT EXISTS public.deliveries (
 
 ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS package_image text;
 ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS sender_email text;
+ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS sender_phone text;
+ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS receiver_phone text;
+ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS pickup_country text;
+ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS destination_country text;
+ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS delivery_language text;
+ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS item_description text;
+ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS delivery_notes text;
+ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS currency text;
+ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS price numeric;
 
 -- 2. CREATE INDEXES FOR PERFORMANCE
 -- ============================================
@@ -113,6 +122,81 @@ WITH CHECK (true);
 INSERT INTO public.app_settings(key, value)
 VALUES ('admin_email', 'admin@gmail.com')
 ON CONFLICT (key) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS public.email_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_type text NOT NULL,
+  tracking_id text,
+  recipient text NOT NULL,
+  resend_id text,
+  status text NOT NULL DEFAULT 'sent',
+  error_message text,
+  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.email_events ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "enable_email_events_read" ON public.email_events;
+CREATE POLICY "enable_email_events_read"
+ON public.email_events
+FOR SELECT
+USING (true);
+
+DROP POLICY IF EXISTS "enable_email_events_write" ON public.email_events;
+CREATE POLICY "enable_email_events_write"
+ON public.email_events
+FOR INSERT
+WITH CHECK (true);
+
+CREATE INDEX IF NOT EXISTS idx_email_events_created_at ON public.email_events(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_email_events_tracking_id ON public.email_events(tracking_id);
+
+CREATE TABLE IF NOT EXISTS public.receipt_links (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tracking_id text NOT NULL,
+  token text NOT NULL UNIQUE,
+  expires_at timestamp with time zone NOT NULL,
+  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.receipt_links ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "enable_receipt_links_read" ON public.receipt_links;
+CREATE POLICY "enable_receipt_links_read"
+ON public.receipt_links
+FOR SELECT
+USING (true);
+
+DROP POLICY IF EXISTS "enable_receipt_links_write" ON public.receipt_links;
+CREATE POLICY "enable_receipt_links_write"
+ON public.receipt_links
+FOR INSERT
+WITH CHECK (true);
+
+CREATE INDEX IF NOT EXISTS idx_receipt_links_tracking_id ON public.receipt_links(tracking_id);
+
+CREATE TABLE IF NOT EXISTS public.user_signups (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  email text NOT NULL,
+  name text,
+  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.user_signups ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "enable_user_signups_read" ON public.user_signups;
+CREATE POLICY "enable_user_signups_read"
+ON public.user_signups
+FOR SELECT
+USING (true);
+
+DROP POLICY IF EXISTS "enable_user_signups_write" ON public.user_signups;
+CREATE POLICY "enable_user_signups_write"
+ON public.user_signups
+FOR INSERT
+WITH CHECK (true);
+
+CREATE INDEX IF NOT EXISTS idx_user_signups_created_at ON public.user_signups(created_at DESC);
 
 NOTIFY pgrst, 'reload schema';
 

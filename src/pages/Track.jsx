@@ -161,7 +161,7 @@ function Track() {
 
       <div className="relative z-10 max-w-5xl mx-auto py-12 px-6">
         <div className="mb-8">
-          <Link to="/" className="inline-flex items-center gap-2 text-xs font-black text-primary hover:text-black transition-colors">
+          <Link to="/" className="inline-flex items-center gap-2 text-xs font-black text-primary hover:text-navy transition-colors">
             <ArrowLeft size={14} />
             <span>Back to Home</span>
           </Link>
@@ -189,7 +189,7 @@ function Track() {
             <button
               type="submit"
               disabled={loading}
-              className="bg-primary hover:bg-black text-white px-8 py-4 rounded-2xl font-black transition-colors disabled:opacity-50 active:scale-95"
+              className="bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-2xl font-black transition-colors disabled:opacity-50 active:scale-95"
             >
               {loading ? 'Searching...' : 'Track parcel'}
             </button>
@@ -197,7 +197,7 @@ function Track() {
         </form>
 
         {error && (
-          <div className="bg-primary rounded-2xl p-5 mb-8 flex gap-3 items-start text-white">
+          <div className="bg-accent rounded-2xl p-5 mb-8 flex gap-3 items-start text-white">
             <AlertCircle size={20} className="text-white flex-shrink-0 mt-0.5" />
             <p className="text-sm font-black leading-snug">{error}</p>
           </div>
@@ -215,13 +215,7 @@ function Track() {
           <div className="space-y-8">
             {showReceipt && (
               <div id="delivery-receipt">
-                <DeliveryReceipt
-                  delivery={delivery}
-                  onImageClick={(nextImages, index) => {
-                    setZoomImages(nextImages || [])
-                    setZoomIndex(index || 0)
-                  }}
-                />
+                <DeliveryReceipt delivery={delivery} />
               </div>
             )}
 
@@ -255,7 +249,7 @@ function Track() {
                   </div>
                   <div>
                     <p className="text-text-muted font-black uppercase tracking-wider">Phone</p>
-                    <p className="font-black text-primary text-sm mt-0.5 truncate">{delivery.phone}</p>
+                    <p className="font-black text-primary text-sm mt-0.5 truncate">{delivery.receiver_phone || delivery.phone}</p>
                   </div>
                 </div>
               </div>
@@ -294,7 +288,7 @@ function Track() {
             
             {delivery.status === 'cancelled' ? (
               /* Cancelled state timeline */
-              <div className="flex gap-4 items-start bg-primary text-white p-6 rounded-2xl">
+              <div className="flex gap-4 items-start bg-accent text-white p-6 rounded-2xl">
                 <div className="w-8 h-8 rounded-full bg-white text-primary flex items-center justify-center font-black">
                   <AlertCircle size={18} />
                 </div>
@@ -373,13 +367,13 @@ function Track() {
 
           {zoomImages.length > 0 && (
             <div
-              className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-6"
+              className="fixed inset-0 z-50 bg-navy/90 backdrop-blur-sm flex items-center justify-center p-6"
               onClick={() => setZoomImages([])}
             >
               <div className="relative max-w-4xl w-full max-h-full" onClick={(e) => e.stopPropagation()}>
                 <button
                   onClick={() => setZoomImages([])}
-                  className="absolute top-4 right-4 bg-black hover:bg-white text-white hover:text-black p-2 rounded-full border border-black transition-all"
+                  className="absolute top-4 right-4 bg-navy hover:bg-white text-white hover:text-text p-2 rounded-full border border-navy transition-all"
                 >
                   <X size={20} />
                 </button>
@@ -388,13 +382,13 @@ function Track() {
                   <>
                     <button
                       onClick={() => setZoomIndex((prev) => (prev - 1 + zoomImages.length) % zoomImages.length)}
-                      className="absolute top-1/2 -translate-y-1/2 left-4 bg-black/70 hover:bg-white text-white hover:text-black p-2 rounded-full border border-black transition-all"
+                      className="absolute top-1/2 -translate-y-1/2 left-4 bg-navy/70 hover:bg-white text-white hover:text-text p-2 rounded-full border border-navy transition-all"
                     >
                       <ChevronLeft size={20} />
                     </button>
                     <button
                       onClick={() => setZoomIndex((prev) => (prev + 1) % zoomImages.length)}
-                      className="absolute top-1/2 -translate-y-1/2 right-4 bg-black/70 hover:bg-white text-white hover:text-black p-2 rounded-full border border-black transition-all"
+                      className="absolute top-1/2 -translate-y-1/2 right-4 bg-navy/70 hover:bg-white text-white hover:text-text p-2 rounded-full border border-navy transition-all"
                     >
                       <ChevronRight size={20} />
                     </button>
@@ -404,7 +398,7 @@ function Track() {
                 <img
                   src={zoomImages[zoomIndex]}
                   alt="Package zoomed preview"
-                  className="rounded-2xl max-w-full max-h-[85vh] object-contain border border-black mx-auto"
+                  className="rounded-2xl max-w-full max-h-[85vh] object-contain border border-navy mx-auto"
                 />
 
                 {zoomImages.length > 1 && (

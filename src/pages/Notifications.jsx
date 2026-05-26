@@ -104,14 +104,14 @@ function Notifications() {
 
       <div className="relative z-10 max-w-6xl mx-auto py-12 px-6 space-y-8">
         <div className="flex items-center justify-between gap-4">
-          <Link to="/dashboard" className="inline-flex items-center gap-2 text-xs font-black text-primary hover:text-black transition-colors">
+          <Link to="/dashboard" className="inline-flex items-center gap-2 text-xs font-black text-primary hover:text-navy transition-colors">
             <ArrowLeft size={14} />
             <span>Back to Portal</span>
           </Link>
           <button
             type="button"
             onClick={load}
-            className="bg-primary hover:bg-black text-white px-4 py-2 rounded-2xl text-xs font-black transition-colors"
+            className="bg-primary hover:bg-navy text-white px-4 py-2 rounded-2xl text-xs font-black transition-colors"
             disabled={loading}
           >
             {loading ? 'Refreshing...' : 'Refresh'}
@@ -132,7 +132,7 @@ function Notifications() {
                 </p>
               </div>
             </div>
-            <div className="bg-black text-white rounded-2xl px-5 py-4 min-w-[220px]">
+            <div className="bg-navy text-white rounded-2xl px-5 py-4 min-w-[220px]">
               <p className="text-[10px] uppercase tracking-widest font-black text-white/60">Total Receipts</p>
               <p className="text-2xl font-black tracking-tight mt-1">{loading ? '…' : deliveries.length}</p>
               <p className="text-[10px] font-black uppercase tracking-wider text-white/60 mt-2">
@@ -143,7 +143,7 @@ function Notifications() {
         </header>
 
         {error && (
-          <div className="bg-primary text-white rounded-2xl p-4 flex gap-3 items-start">
+          <div className="bg-accent text-white rounded-2xl p-4 flex gap-3 items-start">
             <Bell size={18} className="text-white flex-shrink-0 mt-0.5" />
             <p className="text-sm font-black">{error}</p>
           </div>
@@ -161,7 +161,7 @@ function Notifications() {
             <p className="text-xs text-text-muted font-semibold mt-2 max-w-sm mx-auto">
               When an admin marks your package as delivered or cancelled, the receipt will appear here.
             </p>
-            <Link to="/send" className="inline-flex items-center justify-center mt-6 bg-primary hover:bg-black text-white px-6 py-3 rounded-2xl font-black text-sm transition-colors">
+            <Link to="/send" className="inline-flex items-center justify-center mt-6 bg-primary hover:bg-navy text-white px-6 py-3 rounded-2xl font-black text-sm transition-colors">
               Send a package
             </Link>
           </div>
@@ -183,10 +183,10 @@ function Notifications() {
                       key={item.id}
                       type="button"
                       onClick={() => setSelectedId(String(item.id))}
-                      className={`w-full text-left px-6 py-5 transition-colors ${active ? 'bg-black/5' : 'hover:bg-black/5'}`}
+                      className={`w-full text-left px-6 py-5 transition-colors ${active ? 'bg-navy/5' : 'hover:bg-navy/5'}`}
                     >
                       <div className="flex items-start gap-4">
-                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 ${isDelivered ? 'bg-primary text-white' : 'bg-black text-white'}`}>
+                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 ${isDelivered ? 'bg-status-delivered text-white' : 'bg-accent text-white'}`}>
                           {isDelivered ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -205,7 +205,7 @@ function Notifications() {
                           <div className="mt-3">
                             <Link
                               to={`/track?id=${encodeURIComponent(String(item.tracking_id || '').toUpperCase())}`}
-                              className="inline-flex items-center justify-center bg-white hover:bg-black/5 text-primary px-4 py-2 rounded-2xl font-black text-xs transition-colors border border-border"
+                              className="inline-flex items-center justify-center bg-white hover:bg-navy/5 text-primary px-4 py-2 rounded-2xl font-black text-xs transition-colors border border-border"
                               onClick={(e) => e.stopPropagation()}
                             >
                               Open in tracking
@@ -235,13 +235,13 @@ function Notifications() {
 
         {zoomImages.length > 0 && (
           <div
-            className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-6"
+            className="fixed inset-0 z-50 bg-navy/90 backdrop-blur-sm flex items-center justify-center p-6"
             onClick={() => setZoomImages([])}
           >
             <div className="relative max-w-4xl w-full max-h-full" onClick={(e) => e.stopPropagation()}>
               <button
                 onClick={() => setZoomImages([])}
-                className="absolute top-4 right-4 bg-black hover:bg-white text-white hover:text-black p-2 rounded-full border border-black transition-all"
+                className="absolute top-4 right-4 bg-navy hover:bg-white text-white hover:text-text p-2 rounded-full border border-navy transition-all"
               >
                 <X size={20} />
               </button>
@@ -250,13 +250,13 @@ function Notifications() {
                 <>
                   <button
                     onClick={() => setZoomIndex((prev) => (prev - 1 + zoomImages.length) % zoomImages.length)}
-                    className="absolute top-1/2 -translate-y-1/2 left-4 bg-black/70 hover:bg-white text-white hover:text-black p-2 rounded-full border border-black transition-all"
+                    className="absolute top-1/2 -translate-y-1/2 left-4 bg-navy/70 hover:bg-white text-white hover:text-text p-2 rounded-full border border-navy transition-all"
                   >
                     <ChevronLeft size={20} />
                   </button>
                   <button
                     onClick={() => setZoomIndex((prev) => (prev + 1) % zoomImages.length)}
-                    className="absolute top-1/2 -translate-y-1/2 right-4 bg-black/70 hover:bg-white text-white hover:text-black p-2 rounded-full border border-black transition-all"
+                    className="absolute top-1/2 -translate-y-1/2 right-4 bg-navy/70 hover:bg-white text-white hover:text-text p-2 rounded-full border border-navy transition-all"
                   >
                     <ChevronRight size={20} />
                   </button>
@@ -266,7 +266,7 @@ function Notifications() {
               <img
                 src={zoomImages[zoomIndex]}
                 alt="Package zoomed preview"
-                className="rounded-2xl max-w-full max-h-[85vh] object-contain border border-black mx-auto"
+                className="rounded-2xl max-w-full max-h-[85vh] object-contain border border-navy mx-auto"
               />
             </div>
           </div>
@@ -277,4 +277,3 @@ function Notifications() {
 }
 
 export default Notifications
-

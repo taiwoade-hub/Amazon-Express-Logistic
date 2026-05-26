@@ -23,6 +23,10 @@ const seedMockData = () => {
         pickup_location: 'New York, NY',
         destination: 'Los Angeles, CA',
         phone: '+1 (555) 123-4567',
+        sender_phone: '+1 (555) 222-3333',
+        receiver_phone: '+1 (555) 123-4567',
+        item_description: 'Electronics',
+        price: 120,
         package_type: 'standard',
         status: 'in_transit',
         created_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
@@ -36,6 +40,10 @@ const seedMockData = () => {
         pickup_location: 'Chicago, IL',
         destination: 'Miami, FL',
         phone: '+1 (555) 987-6543',
+        sender_phone: '+1 (555) 777-8888',
+        receiver_phone: '+1 (555) 987-6543',
+        item_description: 'Documents',
+        price: 45,
         package_type: 'fragile',
         status: 'processing',
         created_at: new Date(Date.now() - 3600000).toISOString(),  // 1 hour ago
@@ -49,6 +57,10 @@ const seedMockData = () => {
         pickup_location: 'Gotham City',
         destination: 'Metropolis',
         phone: '+1 (555) 111-2222',
+        sender_phone: '+1 (555) 333-4444',
+        receiver_phone: '+1 (555) 111-2222',
+        item_description: 'Materials',
+        price: 0,
         package_type: 'hazardous',
         status: 'delivered',
         created_at: new Date(Date.now() - 172800000).toISOString(), // 2 days ago

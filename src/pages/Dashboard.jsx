@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
-import { Plus, Package, Search, Copy, Check, Eye } from 'lucide-react'
+import { Bell, Plus, Package, Search, Copy, Check, Eye } from 'lucide-react'
 
 function Dashboard() {
   const { user } = useAuth()
@@ -54,9 +54,10 @@ function Dashboard() {
   }
 
   const statusPillClass = (status) => {
-    if (status === 'cancelled') return 'bg-black text-white line-through'
-    if (status === 'delivered') return 'bg-white text-primary border border-border'
-    return 'bg-primary text-white'
+    if (status === 'cancelled') return 'bg-accent text-white line-through'
+    if (status === 'delivered') return 'bg-status-delivered text-white'
+    if (status === 'processing') return 'bg-status-pending text-white'
+    return 'bg-status-transit text-white'
   }
 
   // Filter & Search deliveries
@@ -87,17 +88,26 @@ function Dashboard() {
           <h1 className="text-3xl font-black text-primary tracking-tight">My Deliveries</h1>
           <p className="text-text-muted mt-1 font-semibold">Hello, {user?.name}. Track and manage your sent packages.</p>
         </div>
-        <Link
-          to="/send"
-          className="inline-flex items-center gap-2 bg-primary hover:bg-black text-white px-5 py-3 rounded-2xl font-black transition-colors"
-        >
-          <Plus size={18} />
-          <span>Send a Package</span>
-        </Link>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Link
+            to="/notifications"
+            className="inline-flex items-center justify-center gap-2 bg-white hover:bg-navy/5 text-primary px-5 py-3 rounded-2xl font-black transition-colors border border-border"
+          >
+            <Bell size={18} />
+            <span>Inbox</span>
+          </Link>
+          <Link
+            to="/send"
+            className="inline-flex items-center justify-center gap-2 bg-primary hover:bg-navy text-white px-5 py-3 rounded-2xl font-black transition-colors"
+          >
+            <Plus size={18} />
+            <span>Send a Package</span>
+          </Link>
+        </div>
       </div>
 
       {error && (
-        <div className="bg-primary text-white rounded-2xl p-4 mb-6 text-sm font-black">
+        <div className="bg-accent text-white rounded-2xl p-4 mb-6 text-sm font-black">
           {error}
         </div>
       )}
@@ -131,7 +141,7 @@ function Dashboard() {
           />
         </div>
 
-        <div className="flex bg-black/5 rounded-2xl p-1 w-full md:w-auto border border-border">
+        <div className="flex bg-navy/5 rounded-2xl p-1 w-full md:w-auto border border-border">
           {[
             { key: 'all', label: 'All' },
             { key: 'in_transit', label: 'In Transit' },
@@ -160,14 +170,14 @@ function Dashboard() {
           <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-4 text-white">
             <Package size={24} />
           </div>
-          <h3 className="text-lg font-black text-primary">No Deliveries Found</h3>
+            <h3 className="text-lg font-black text-primary">No Deliveries Found</h3>
           <p className="text-text-muted font-semibold text-sm mt-2 max-w-sm mx-auto">
             {deliveries.length === 0 ? "You haven't created any deliveries yet." : 'No deliveries match your current filters.'}
           </p>
           {deliveries.length === 0 && (
             <Link
               to="/send"
-              className="inline-flex items-center justify-center bg-primary hover:bg-black text-white px-6 py-3 rounded-2xl font-black transition-colors mt-6"
+                className="inline-flex items-center justify-center bg-primary hover:bg-navy text-white px-6 py-3 rounded-2xl font-black transition-colors mt-6"
             >
               Send Your First Package
             </Link>
@@ -182,7 +192,7 @@ function Dashboard() {
                   <p className="font-black text-primary">{delivery.tracking_id}</p>
                   <button
                     onClick={() => handleCopy(delivery.tracking_id)}
-                    className="p-1 rounded-lg hover:bg-black/5 text-text-muted transition-colors"
+                    className="p-1 rounded-lg hover:bg-navy/5 text-text-muted transition-colors"
                     title="Copy Tracking ID"
                   >
                     {copiedId === delivery.tracking_id ? <Check size={14} /> : <Copy size={14} />}
@@ -202,7 +212,7 @@ function Dashboard() {
                 </span>
                 <Link
                   to={`/track?id=${delivery.tracking_id}`}
-                  className="inline-flex items-center gap-1.5 bg-primary hover:bg-black text-white px-4 py-2 rounded-2xl text-sm font-black transition-colors"
+                  className="inline-flex items-center gap-1.5 bg-primary hover:bg-navy text-white px-4 py-2 rounded-2xl text-sm font-black transition-colors"
                 >
                   <Eye size={16} />
                   <span>Track</span>
@@ -218,7 +228,7 @@ function Dashboard() {
           <p className="font-black text-primary">Ship with Confidence</p>
           <p className="text-sm text-text-muted font-semibold mt-1">Create a new delivery in seconds and share the tracking ID.</p>
         </div>
-        <Link to="/send" className="bg-primary hover:bg-black text-white px-5 py-3 rounded-2xl font-black transition-colors">
+        <Link to="/send" className="bg-primary hover:bg-navy text-white px-5 py-3 rounded-2xl font-black transition-colors">
           Send a Package
         </Link>
       </div>

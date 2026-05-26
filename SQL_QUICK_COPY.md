@@ -23,6 +23,17 @@ CREATE TABLE IF NOT EXISTS public.deliveries (
   CONSTRAINT valid_status CHECK (status IN ('processing', 'picked_up', 'in_transit', 'delivered', 'cancelled'))
 );
 
+-- Add optional columns used by the app (safe to re-run)
+ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS sender_phone text;
+ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS receiver_phone text;
+ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS pickup_country text;
+ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS destination_country text;
+ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS delivery_language text;
+ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS item_description text;
+ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS delivery_notes text;
+ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS currency text;
+ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS price numeric;
+
 -- Create indexes
 CREATE INDEX IF NOT EXISTS idx_deliveries_tracking_id ON public.deliveries(tracking_id);
 CREATE INDEX IF NOT EXISTS idx_deliveries_status ON public.deliveries(status);

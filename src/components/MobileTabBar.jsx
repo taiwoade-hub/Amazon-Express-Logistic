@@ -6,7 +6,7 @@ function MobileTabBar() {
   const location = useLocation()
   const { user, isAdmin } = useAuth()
 
-  if (location.pathname === '/login') return null
+  if (location.pathname === '/login' || location.pathname === '/signup') return null
 
   const items = [
     { to: '/', label: 'Home', icon: Home },

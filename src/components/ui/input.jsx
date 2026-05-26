@@ -15,4 +15,3 @@ function Input({ className, ...props }) {
 }
 
 export { Input }
-
