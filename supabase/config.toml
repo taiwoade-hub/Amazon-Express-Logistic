@@ -1,0 +1,24 @@
+project_id = "courier-system-ui"
+
+[api]
+enabled = true
+
+[db]
+major_version = 15
+
+[auth]
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173", "http://127.0.0.1:5173"]
+
+[functions.auth-welcome]
+verify_jwt = true
+
+[functions.deliveries-send-created-email]
+verify_jwt = true
+
+[functions.deliveries-send-status-email]
+verify_jwt = true
+
+[functions.receipts-get-admin-url]
+verify_jwt = true
+

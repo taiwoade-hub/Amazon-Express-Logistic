@@ -36,21 +36,34 @@ CREATE INDEX IF NOT EXISTS idx_tracking_id ON deliveries(tracking_id);
 -- Enable RLS
 ALTER TABLE deliveries ENABLE ROW LEVEL SECURITY;
 
--- Allow public read/write (drop first to prevent duplicate errors)
-DROP POLICY IF EXISTS "Allow public read" ON public.deliveries;
-DROP POLICY IF EXISTS "Allow public read" ON deliveries;
-CREATE POLICY "Allow public read" ON deliveries
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT
+    COALESCE(
+      (auth.jwt() ->> 'email') =
+        (SELECT value FROM public.app_settings WHERE key = 'admin_email' LIMIT 1),
+      false
+    )
+$$;
+
+DROP POLICY IF EXISTS "Allow public delivery read" ON public.deliveries;
+CREATE POLICY "Allow public delivery read" ON deliveries
   FOR SELECT USING (true);
 
-DROP POLICY IF EXISTS "Allow public insert" ON public.deliveries;
-DROP POLICY IF EXISTS "Allow public insert" ON deliveries;
-CREATE POLICY "Allow public insert" ON deliveries
+DROP POLICY IF EXISTS "Allow public delivery insert" ON public.deliveries;
+CREATE POLICY "Allow public delivery insert" ON deliveries
   FOR INSERT WITH CHECK (true);
 
-DROP POLICY IF EXISTS "Allow public update" ON public.deliveries;
-DROP POLICY IF EXISTS "Allow public update" ON deliveries;
-CREATE POLICY "Allow public update" ON deliveries
-  FOR UPDATE USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow admin delivery update" ON public.deliveries;
+CREATE POLICY "Allow admin delivery update" ON deliveries
+  FOR UPDATE USING (public.is_admin()) WITH CHECK (public.is_admin());
+
+DROP POLICY IF EXISTS "Allow admin delivery delete" ON public.deliveries;
+CREATE POLICY "Allow admin delivery delete" ON deliveries
+  FOR DELETE USING (public.is_admin());
 
 CREATE TABLE IF NOT EXISTS address_book (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -78,9 +91,9 @@ DROP POLICY IF EXISTS "Allow app settings read" ON app_settings;
 CREATE POLICY "Allow app settings read" ON app_settings
   FOR SELECT USING (true);
 
-DROP POLICY IF EXISTS "Allow app settings write" ON app_settings;
-CREATE POLICY "Allow app settings write" ON app_settings
-  FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow app settings admin write" ON app_settings;
+CREATE POLICY "Allow app settings admin write" ON app_settings
+  FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 INSERT INTO app_settings(key, value)
 VALUES ('admin_email', 'admin@gmail.com')
@@ -101,11 +114,7 @@ ALTER TABLE email_events ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Allow email events read" ON email_events;
 CREATE POLICY "Allow email events read" ON email_events
-  FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Allow email events insert" ON email_events;
-CREATE POLICY "Allow email events insert" ON email_events
-  FOR INSERT WITH CHECK (true);
+  FOR SELECT USING (public.is_admin());
 
 CREATE TABLE IF NOT EXISTS receipt_links (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

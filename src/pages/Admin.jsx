@@ -5,6 +5,9 @@ import { Download, Edit2, Save, X, Search, Package, ShieldAlert, Eye, Trash2, Ch
 import { getDeliveryImages } from '../lib/deliveryImages'
 import { format, formatDistanceToNow } from 'date-fns'
 import AdminShell from '../components/AdminShell'
+import { useToast } from '../context/ToastContext'
+import { invokeEdgeFunction } from '../lib/api/edgeFunctions'
+import { getAdminReceiptUrl } from '../lib/api/receipts'
 
 function formatRelativeDateTime(value) {
   if (!value) return ''
@@ -15,6 +18,7 @@ function formatRelativeDateTime(value) {
 
 function Admin() {
   const { user, isAdmin, changeAdminEmail, getAdminEmail } = useAuth()
+  const { notify } = useToast()
   const [deliveries, setDeliveries] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState(null)
@@ -111,6 +115,13 @@ function Admin() {
       if (updateError) throw updateError
 
       setSuccess('Status updated successfully')
+      if (editingStatus === 'delivered') {
+        notify({ variant: 'success', title: 'Marked delivered', message: 'Shipment status updated to delivered.' })
+      } else if (editingStatus === 'cancelled') {
+        notify({ variant: 'danger', title: 'Marked cancelled', message: 'Shipment status updated to cancelled.' })
+      } else if (editingStatus === 'picked_up') {
+        notify({ variant: 'success', title: 'Marked picked up', message: 'Shipment status updated to picked up.' })
+      }
       setEditingId(null)
       fetchDeliveries()
       if (editingStatus === 'picked_up' || editingStatus === 'delivered' || editingStatus === 'cancelled') {
@@ -122,16 +133,12 @@ function Admin() {
     } catch (err) {
       console.error('Error updating status:', err)
       setError('Failed to update shipment status.')
+      notify({ variant: 'danger', title: 'Update failed', message: 'Failed to update shipment status.' })
     }
   }
 
   const sendPendingStatusEmail = async () => {
     if (!pendingEmail?.deliveryId || !pendingEmail?.status) return
-    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL
-    if (!apiBaseUrl) {
-      setError('VITE_API_BASE_URL is not configured.')
-      return
-    }
 
     const status = pendingEmail.status
     const type = status === 'picked_up' ? 'approved' : status
@@ -141,84 +148,48 @@ function Admin() {
       setError('')
       setSuccess('')
 
-      const headers = { 'content-type': 'application/json' }
-      if (!supabase.isMock && supabase.auth) {
-        const { data } = await supabase.auth.getSession()
-        const token = data?.session?.access_token
-        if (token) {
-          headers.Authorization = `Bearer ${token}`
-        }
-      }
-
-      if (!headers.Authorization) {
-        headers['x-admin-email'] = user?.email || ''
-        const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD
-        if (adminPassword) headers['x-admin-password'] = adminPassword
-      }
-
-      const resp = await fetch(`${apiBaseUrl.replace(/\/+$/, '')}/admin/send-status-email`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ deliveryId: pendingEmail.deliveryId, type })
+      const result = await invokeEdgeFunction('deliveries-send-status-email', {
+        deliveryId: pendingEmail.deliveryId,
+        type
       })
-
-      let payload = null
-      try {
-        payload = await resp.json()
-      } catch {
-      }
-
-      if (!resp.ok) {
-        setError(payload?.error || 'Failed to send email.')
+      if (!result.ok) {
+        setError(result.error || 'Failed to send email.')
+        notify({ variant: 'danger', title: 'Email failed', message: result.error || 'Could not send the notification email.' })
         return
       }
 
       setSuccess('Email sent successfully')
+      notify({ variant: 'success', title: 'Email sent', message: `Tracking update sent for ${type}` })
       setPendingEmail(null)
       setTimeout(() => setSuccess(''), 3000)
     } catch {
       setError('Failed to send email.')
+      notify({ variant: 'danger', title: 'Email failed', message: 'Could not send the notification email.' })
     } finally {
       setSendingEmail(false)
     }
   }
 
   const downloadReceiptPdf = async (trackingId) => {
-    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL
-    if (!apiBaseUrl) {
-      setError('VITE_API_BASE_URL is not configured.')
-      return
-    }
-
     const cleanTrackingId = String(trackingId || '').trim()
     if (!cleanTrackingId) return
 
+    let signedUrl = ''
     try {
       setError('')
       setSuccess('')
-
-      const headers = {}
-      if (!supabase.isMock && supabase.auth) {
-        const { data } = await supabase.auth.getSession()
-        const token = data?.session?.access_token
-        if (token) headers.Authorization = `Bearer ${token}`
+      const urlResult = await getAdminReceiptUrl(cleanTrackingId)
+      if (!urlResult.ok) {
+        setError(urlResult.error || 'Failed to generate receipt.')
+        notify({ variant: 'danger', title: 'Receipt failed', message: urlResult.error || 'Could not generate the receipt.' })
+        return
       }
 
-      if (!headers.Authorization) {
-        headers['x-admin-email'] = user?.email || ''
-        const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD
-        if (adminPassword) headers['x-admin-password'] = adminPassword
-      }
-
-      const url = `${apiBaseUrl.replace(/\/+$/, '')}/admin/receipts/${encodeURIComponent(cleanTrackingId)}.pdf`
-      const resp = await fetch(url, { headers })
+      signedUrl = urlResult.data.url
+      const resp = await fetch(signedUrl)
       if (!resp.ok) {
-        let payload = null
-        try {
-          payload = await resp.json()
-        } catch {
-        }
-        setError(payload?.error || 'Failed to download PDF.')
+        setError('Failed to download PDF.')
+        notify({ variant: 'danger', title: 'Receipt failed', message: 'Could not download the receipt PDF.' })
         return
       }
 
@@ -231,8 +202,15 @@ function Admin() {
       a.click()
       a.remove()
       URL.revokeObjectURL(objectUrl)
-    } catch {
-      setError('Failed to download PDF.')
+    } catch (err) {
+      const message = String(err?.message || err || 'Failed to download PDF.')
+      setError(message)
+      notify({ variant: 'danger', title: 'Receipt failed', message })
+      if (signedUrl) {
+        try {
+          window.open(signedUrl, '_blank', 'noopener,noreferrer')
+        } catch {}
+      }
     }
   }
 

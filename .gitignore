@@ -13,6 +13,7 @@
 .env.*.local
 f.env
 benv
+supabase/.env.local
 
 # logs
 npm-debug.log*

@@ -41,7 +41,7 @@ The system is built around 3 core actions:
 
 - **Frontend**: React.js + Vite
 - **Routing**: React Router
-- **Backend**: Supabase (Database + Realtime)
+- **Backend**: Supabase (Database + Auth + Storage + Realtime + Edge Functions)
 - **Database**: PostgreSQL (via Supabase)
 - **Styling**: Tailwind CSS
 - **Icons**: Lucide React
@@ -104,17 +104,18 @@ Create a `.env` file in the root directory (copy `.env.example`):
 ```
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-VITE_API_BASE_URL=http://localhost:8787
 VITE_ADMIN_EMAIL=admin@gmail.com
-VITE_ADMIN_PASSWORD=##5351235admin
 ```
 
 For Supabase: get the URL + anon key from your Supabase project settings.
 
 Admin access:
 - The admin user is determined by the `admin_email` value in the `app_settings` table (or `VITE_ADMIN_EMAIL` as a fallback for UI gating).
-- There is no hardcoded admin password in the codebase.
-- For local mock-only usage (no Supabase), `VITE_ADMIN_PASSWORD` can be used to allow an admin login on the client.
+- Admin authentication is handled by Supabase Auth (create an admin user account in Supabase).
+
+Edge Function secrets (server-side, never exposed to the frontend):
+- Copy `supabase/.env.example` to `supabase/.env.local` and fill in values.
+- Load secrets into your project with `npx supabase secrets set --env-file supabase/.env.local`.
 
 ---
 
@@ -122,10 +123,8 @@ Admin access:
 
 1. Go to [https://supabase.com](https://supabase.com)
 2. Create a new project
-3. In the SQL Editor, run the schema creation script:
-   - Copy the SQL from `src/lib/createSchema.sql`
-   - Execute it in your Supabase SQL Editor
-   - Run it again anytime you pull updates (it uses `IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`)
+3. For local development, migrations are in `supabase/migrations/`.
+   - For a hosted Supabase project, you can still copy the SQL from `supabase/migrations/20260526_init.sql` into the SQL editor.
 4. Copy your API keys:
    - Go to Settings → API
    - Copy `Project URL` and `anon public` key
@@ -225,10 +224,13 @@ npm install
 cp .env.example .env
 # Edit .env with your Supabase credentials
 
-# 4. Set up database schema
-# - Go to Supabase SQL Editor
-# - Copy/paste src/lib/createSchema.sql
-# - Execute
+# 4. Configure Edge Function secrets
+cp supabase/.env.example supabase/.env.local
+# Edit supabase/.env.local with:
+# - SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY
+# - RESEND_API_KEY / RESEND_FROM
+# - PUBLIC_APP_URL
+npx supabase secrets set --env-file supabase/.env.local
 
 # 5. Start development server
 npm run dev

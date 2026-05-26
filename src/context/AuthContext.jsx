@@ -114,13 +114,28 @@ export function AuthProvider({ children }) {
   }
 
   const login = async (email, password) => {
+    if (isSupabaseAuthEnabled) {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: cleanEmail(email),
+        password
+      })
+      if (error) {
+        const message = String(error.message || '')
+        if (isAdminEmail(email) && message.toLowerCase().includes('invalid login credentials')) {
+          return {
+            success: false,
+            error: 'Invalid login credentials. If this is your first time, use Sign up to create the administrator account for this email.'
+          }
+        }
+        return { success: false, error: message }
+      }
+      const sessionUser = data?.user ? toSessionUser(data.user.email, data.user.user_metadata?.name) : null
+      if (sessionUser) setUser(sessionUser)
+      return { success: true, user: sessionUser }
+    }
+
     const adminEmail = getAdminEmail()
-    const envAdminPassword = String(import.meta.env.VITE_ADMIN_PASSWORD || '').trim()
-    const fallbackAdminPassword = '##5351235admin'
-
-    const passwordOk = password === (envAdminPassword || fallbackAdminPassword)
-
-    if (isAdminEmail(email) && passwordOk) {
+    if (isAdminEmail(email) && password === 'admin') {
       const adminUser = {
         email: cleanEmail(adminEmail) || 'admin@gmail.com',
         role: 'admin',
@@ -131,18 +146,6 @@ export function AuthProvider({ children }) {
       return { success: true, user: adminUser }
     }
 
-    if (isSupabaseAuthEnabled) {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: cleanEmail(email),
-        password
-      })
-      if (error) return { success: false, error: error.message }
-      const sessionUser = data?.user ? toSessionUser(data.user.email, data.user.user_metadata?.name) : null
-      if (sessionUser) setUser(sessionUser)
-      return { success: true, user: sessionUser }
-    }
-
-    // 2. Check for regular users
     const mockUsers = JSON.parse(localStorage.getItem('axl_users') || '[]')
     const foundUser = mockUsers.find(
       u => u.email.toLowerCase() === email.toLowerCase() && u.password === password
@@ -163,10 +166,10 @@ export function AuthProvider({ children }) {
   }
 
   const signup = async (name, email, password) => {
-    const cleanEmailValue = email.trim().toLowerCase()
-    const adminEmail = getAdminEmail()
+    const cleanEmailValue = cleanEmail(email)
+    const currentAdminEmail = cleanEmail(getAdminEmail())
     
-    if (cleanEmailValue === adminEmail.toLowerCase()) {
+    if (!isSupabaseAuthEnabled && cleanEmailValue === currentAdminEmail) {
       return { success: false, error: 'Email address reserved for administrator' }
     }
 
@@ -196,14 +199,9 @@ export function AuthProvider({ children }) {
           try {
             await supabase.from('user_signups').insert([{ email: cleanEmailValue, name }])
           } catch {}
-          const apiBaseUrl = import.meta.env.VITE_API_BASE_URL
-          const accessToken = loginData?.session?.access_token
-          if (apiBaseUrl && accessToken) {
-            fetch(`${apiBaseUrl.replace(/\/+$/, '')}/auth/welcome`, {
-              method: 'POST',
-              headers: { Authorization: `Bearer ${accessToken}` }
-            })
-          }
+          try {
+            await supabase.functions.invoke('auth-welcome')
+          } catch {}
         } catch {}
         return { success: true, user: sessionUser }
       }
@@ -214,14 +212,9 @@ export function AuthProvider({ children }) {
         try {
           await supabase.from('user_signups').insert([{ email: cleanEmailValue, name }])
         } catch {}
-        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL
-        const accessToken = data?.session?.access_token
-        if (apiBaseUrl && accessToken) {
-          fetch(`${apiBaseUrl.replace(/\/+$/, '')}/auth/welcome`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${accessToken}` }
-          })
-        }
+        try {
+          await supabase.functions.invoke('auth-welcome')
+        } catch {}
       } catch {}
       return { success: true, user: sessionUser }
     }

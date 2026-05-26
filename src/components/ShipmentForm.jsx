@@ -7,6 +7,8 @@ import { COUNTRIES } from '../lib/countries'
 import { DELIVERY_LANGUAGES } from '../lib/deliveryLanguages'
 import { CURRENCIES } from '../lib/currencies'
 import { serializeDeliveryImages } from '../lib/deliveryImages'
+import { useToast } from '../context/ToastContext'
+import { invokeEdgeFunction } from '../lib/api/edgeFunctions'
 
 function generateTrackingId() {
   const random = Math.floor(Math.random() * 1000000)
@@ -15,6 +17,7 @@ function generateTrackingId() {
 
 function ShipmentForm({ title, description }) {
   const { user } = useAuth()
+  const { notify } = useToast()
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [trackingId, setTrackingId] = useState('')
@@ -377,22 +380,23 @@ function ShipmentForm({ title, description }) {
       }
 
       try {
-        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL
-        if (!supabase.isMock && apiBaseUrl && supabase.auth) {
-          const { data } = await supabase.auth.getSession()
-          const token = data?.session?.access_token
-          if (token) {
-            fetch(`${apiBaseUrl.replace(/\/+$/, '')}/deliveries/send-created-email`, {
-              method: 'POST',
-              headers: { 'content-type': 'application/json', Authorization: `Bearer ${token}` },
-              body: JSON.stringify({ trackingId: newTrackingId })
-            })
-          }
+        const result = await invokeEdgeFunction('deliveries-send-created-email', { trackingId: newTrackingId })
+        if (!result.ok) {
+          notify({
+            variant: 'danger',
+            title: 'Email not sent',
+            message: result.error || 'We could not send the package creation email.'
+          })
         }
       } catch {
       }
 
       setTrackingId(newTrackingId)
+      notify({
+        variant: 'success',
+        title: 'Package created',
+        message: `Tracking ID: ${newTrackingId}`
+      })
       setSuccess(true)
       setFormData({
         sender_name: user?.name || '',
