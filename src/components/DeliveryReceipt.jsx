@@ -231,7 +231,9 @@ function DeliveryReceipt({ delivery }) {
               We appreciate your trust and look forward to serving you again.
             </p>
             <p className="mt-2 text-xs font-semibold text-text-muted">
-              Support: {COMPANY_PROFILE.emailDisplay} • {COMPANY_PROFILE.phoneDisplay}
+              {COMPANY_PROFILE.phoneDisplay} • {COMPANY_PROFILE.addressDisplay}
+              <br />
+              © 2026 All rights reserved.
             </p>
           </div>
         </div>

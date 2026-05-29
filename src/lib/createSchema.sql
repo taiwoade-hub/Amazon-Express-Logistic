@@ -151,4 +151,11 @@ DROP POLICY IF EXISTS "Allow user signups insert" ON user_signups;
 CREATE POLICY "Allow user signups insert" ON user_signups
   FOR INSERT WITH CHECK (true);
 
+GRANT ALL ON TABLE public.deliveries TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.address_book TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.app_settings TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.email_events TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.receipt_links TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.user_signups TO anon, authenticated, service_role;
+
 NOTIFY pgrst, 'reload schema';

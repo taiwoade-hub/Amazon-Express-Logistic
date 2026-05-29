@@ -198,8 +198,14 @@ WITH CHECK (true);
 
 CREATE INDEX IF NOT EXISTS idx_user_signups_created_at ON public.user_signups(created_at DESC);
 
-NOTIFY pgrst, 'reload schema';
+GRANT ALL ON TABLE public.deliveries TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.address_book TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.app_settings TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.email_events TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.receipt_links TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.user_signups TO anon, authenticated, service_role;
 
+NOTIFY pgrst, 'reload schema';
 -- ============================================
 -- SETUP COMPLETE!
 -- ============================================

@@ -40,6 +40,27 @@ export async function generateReceiptPdfBase64(delivery: Record<string, unknown>
   const page = doc.addPage([595.28, 841.89])
   const { width, height } = page.getSize()
 
+  const appUrl = String(Deno.env.get('PUBLIC_APP_URL') || 'https://amazonlogisics.com').replace(/\/+$/, '')
+  const trackUrl = `${appUrl}/#/track?id=${encodeURIComponent(safe(delivery.tracking_id))}`
+
+  let qrImage
+  try {
+    const qrResp = await fetch(`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(trackUrl)}`)
+    if (qrResp.ok) {
+      const qrBytes = await qrResp.arrayBuffer()
+      qrImage = await doc.embedPng(qrBytes)
+    }
+  } catch (e) {}
+
+  let logoImage
+  try {
+    const logoResp = await fetch(`${appUrl}/favicon.jpg`)
+    if (logoResp.ok) {
+      const logoBytes = await logoResp.arrayBuffer()
+      logoImage = await doc.embedJpg(logoBytes)
+    }
+  } catch (e) {}
+
   const fontBold = await doc.embedFont(StandardFonts.HelveticaBold)
   const font = await doc.embedFont(StandardFonts.Helvetica)
 
@@ -51,8 +72,14 @@ export async function generateReceiptPdfBase64(delivery: Record<string, unknown>
   const status = safe(delivery.status || 'processing').toUpperCase()
 
   page.drawRectangle({ x: 48, y: height - 120, width: width - 96, height: 88, borderColor: border, borderWidth: 1 })
-  page.drawText('AmazonLogisics', { x: 64, y: height - 70, size: 18, font: fontBold, color: primary })
-  page.drawText('Shipment Receipt', { x: 64, y: height - 94, size: 11, font, color: muted })
+  if (logoImage) {
+    page.drawImage(logoImage, { x: 64, y: height - 100, width: 40, height: 40 })
+    page.drawText('AmazonLogisics', { x: 114, y: height - 76, size: 18, font: fontBold, color: primary })
+    page.drawText('Shipment Receipt', { x: 114, y: height - 94, size: 11, font, color: muted })
+  } else {
+    page.drawText('AmazonLogisics', { x: 64, y: height - 70, size: 18, font: fontBold, color: primary })
+    page.drawText('Shipment Receipt', { x: 64, y: height - 94, size: 11, font, color: muted })
+  }
 
   page.drawText('Tracking ID', { x: width - 220, y: height - 70, size: 9, font: fontBold, color: muted })
   page.drawText(trackingId || '—', { x: width - 220, y: height - 92, size: 14, font: fontBold, color: rgb(0.14, 0.39, 0.92) })
@@ -100,8 +127,14 @@ export async function generateReceiptPdfBase64(delivery: Record<string, unknown>
   page.drawText(`Declared item: ${safe(delivery.item_description) || '—'}`, { x: 220, y: detailsY + 16, size: 9, font, color: muted, maxWidth: width - 330 })
   page.drawText(`Price: ${fmtMoney(delivery.price, delivery.currency)}`, { x: width - 210, y: detailsY + 16, size: 9, font: fontBold, color: primary })
 
-  page.drawText('Thank you for choosing AmazonLogisics.', { x: 48, y: 72, size: 11, font: fontBold, color: primary })
-  page.drawText('For help, reply to your shipment emails or visit the tracking page.', { x: 48, y: 52, size: 9, font, color: muted })
+  page.drawText('Thank you for choosing AmazonLogisics.', { x: 48, y: 122, size: 11, font: fontBold, color: primary })
+  page.drawText('+44 7385284814 • 123 Mabini Street, Barangay San Isidro, Quezon City, Metro Manila', { x: 48, y: 102, size: 9, font, color: muted })
+  page.drawText('For help, reply to your shipment emails or visit the tracking page.', { x: 48, y: 82, size: 9, font, color: muted })
+  page.drawText('© 2026 All rights reserved.', { x: 48, y: 62, size: 9, font, color: muted })
+
+  if (qrImage) {
+    page.drawImage(qrImage, { x: width - 128, y: 62, width: 80, height: 80 })
+  }
 
   const bytes = await doc.save()
   return toBase64(bytes)

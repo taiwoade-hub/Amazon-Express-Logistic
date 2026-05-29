@@ -24,8 +24,8 @@ async function ensureReceiptPdf(args: {
     }
   } catch {}
 
-  const existing = await args.supabase.storage.from(bucket).createSignedUrl(objectPath, 60)
-  if (!existing.error && existing.data?.signedUrl) return { ok: true as const, url: existing.data.signedUrl, objectPath }
+  // Removed the early return so the PDF is ALWAYS regenerated with the latest status and layout
+
 
   const { data: delivery, error } = await args.supabase
     .from('deliveries')

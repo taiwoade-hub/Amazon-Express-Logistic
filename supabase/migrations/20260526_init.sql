@@ -131,3 +131,9 @@ using (public.is_admin());
 insert into storage.buckets (id, name, public)
 values ('receipts', 'receipts', false)
 on conflict (id) do nothing;
+
+GRANT ALL ON TABLE public.deliveries TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.address_book TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.app_settings TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.email_events TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.user_signups TO anon, authenticated, service_role;

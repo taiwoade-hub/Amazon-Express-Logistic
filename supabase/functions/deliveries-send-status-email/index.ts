@@ -70,6 +70,15 @@ Deno.serve(async (req) => {
     const { data: delivery, error } = await service.from('deliveries').select('*').eq('id', deliveryId).maybeSingle()
     if (error || !delivery) return json({ error: 'Delivery not found' }, { status: 404 })
 
+    const { count, error: countError } = await service
+      .from('email_events')
+      .select('*', { count: 'exact', head: true })
+      .eq('tracking_id', delivery.tracking_id)
+
+    if (count !== null && count >= 4) {
+      return json({ error: 'Email limit reached (max 4 times per shipment)' }, { status: 403 })
+    }
+
     const trackingId = String(delivery.tracking_id || '').trim().toUpperCase()
     const to = String(delivery.sender_email || '').trim().toLowerCase()
     if (!to) return json({ error: 'Sender email is missing for this delivery' }, { status: 400 })
